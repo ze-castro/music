@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/state';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { tick } from 'svelte';
   import { Disc3, Mic2, Music2, ListMusic, Sparkles, Search, Settings, Library } from '@lucide/svelte';
   import MiniPlayer from '$lib/components/MiniPlayer.svelte';
   import NowPlaying from '$lib/components/NowPlaying.svelte';
@@ -34,12 +36,23 @@
     else if (e.key === 'ArrowLeft') { e.preventDefault(); e.shiftKey ? player.prev() : player.seekBy(-10); }
     else if (e.key === 'Escape') player.expanded = false;
   }
+
+  // Scroll restoration for <main> (inner scroller — SvelteKit only restores window scroll)
+  let mainEl = $state<HTMLElement | null>(null);
+  const scrollPos = new Map<string, number>();
+  const key = (u: URL) => u.pathname + u.search;
+  beforeNavigate(({ from }) => { if (from && mainEl) scrollPos.set(key(from.url), mainEl.scrollTop); });
+  afterNavigate(async ({ to, type }) => {
+    if (!mainEl || !to) return;
+    await tick();
+    mainEl.scrollTop = type === 'popstate' ? (scrollPos.get(key(to.url)) ?? 0) : 0;
+  });
 </script>
 
 <svelte:window onkeydown={onKey} />
 
 {#if data.user}
-  <div class="flex h-screen w-full flex-col overflow-hidden md:flex-row">
+  <div class="flex h-[100lvh] w-full flex-col overflow-hidden md:flex-row">
     <aside class="hidden md:flex w-56 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground pt-safe">
       <div class="px-4 py-4 text-lg font-semibold tracking-tight">Music</div>
       <nav class="flex-1 space-y-0.5 px-2">
@@ -57,15 +70,16 @@
 
     <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <!-- mobile: leave room under content for the floating stack -->
-      <main class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pt-safe {player.current ? 'pb-44' : 'pb-24'} md:pb-0">
+      <main bind:this={mainEl} class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pt-safe {player.current ? 'pb-44' : 'pb-24'} md:pb-0">
         {@render children()}
       </main>
 
       <!-- desktop: docked mini player -->
       <div class="hidden md:block"><MiniPlayer /></div>
 
-        <!-- mobile: floating mini player + pill tab bar -->
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px)">
+      <!-- mobile: floating mini player + pill tab bar -->
+      <div class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px)">
+        <div class="pointer-events-auto mx-3 flex flex-col items-center gap-1.5">
           <div class="w-full"><MiniPlayer floating /></div>
           <nav class="flex items-center gap-1 rounded-full border bg-card/80 p-1 shadow-lg backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
             {#each mobileNav as n}
