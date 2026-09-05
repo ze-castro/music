@@ -64,8 +64,8 @@
       <!-- desktop: docked mini player -->
       <div class="hidden md:block"><MiniPlayer /></div>
 
-      <!-- mobile: floating mini player + pill tab bar -->
-      <div class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: max(6px, min(env(safe-area-inset-bottom), 14px))">        <div class="pointer-events-auto mx-3 flex flex-col items-center gap-1.5">
+        <!-- mobile: floating mini player + pill tab bar -->
+        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px)">
           <div class="w-full"><MiniPlayer floating /></div>
           <nav class="flex items-center gap-1 rounded-full border bg-card/80 p-1 shadow-lg backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
             {#each mobileNav as n}

@@ -105,7 +105,7 @@ body {
   }
   /* iOS safe areas for standalone PWA. Bottom capped: iOS 26 reports oversized insets. */
   .pb-safe {
-    padding-bottom: min(env(safe-area-inset-bottom), 20px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .pt-safe {
     padding-top: env(safe-area-inset-top);
