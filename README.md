@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="static/icon-512.png" alt="Music" width="120" style="border-radius: 20px;" />
+  <img src="static/icon.png" alt="Music" width="120" />
 
   <h1>Music</h1>
 
