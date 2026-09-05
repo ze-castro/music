@@ -11,9 +11,9 @@
 Streams your own library through the Subsonic/OpenSubsonic API, adds a "For You" discovery layer powered by Deezer's public API (30-second previews), and installs as a home-screen web app on iPhone and Mac. One container, one SQLite file, nothing else to run.
 
 <div align="center">
-  <img src="static/screenshot-desktop.png" alt="Desktop" width="700" />
+  <img src="static/desktop.png" alt="Desktop" width="700" />
   <br />
-  <img src="static/screenshot-mobile.png" alt="Mobile" width="260" />
+  <img src="static/mobile.png" alt="Mobile" width="260" />
 </div>
 
 ---
