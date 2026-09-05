@@ -92,8 +92,8 @@
     <button
       onclick={shuffleAll}
       aria-label="Shuffle"
-      class="fixed right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-foreground text-background shadow-lg md:hidden"
-      style="bottom: calc(env(safe-area-inset-bottom, 0px) + {player.current ? 8.5 : 3.75}rem)"
+      class="fixed right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-foreground text-background shadow-lg md:hidden"
+      style="bottom: calc(var(--bottom-stack, 6.5rem) + 0.75rem)"
     >
       <Shuffle size={22} />
     </button>

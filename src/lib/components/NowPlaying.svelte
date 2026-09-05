@@ -10,11 +10,9 @@
     Repeat1,
   } from '@lucide/svelte';
   import { player } from '$lib/stores/player.svelte';
-  import { settings } from '$lib/stores/settings.svelte';
   import { fmtTime } from '$lib/utils';
   import Artwork from './Artwork.svelte';
   import LikeButton from './LikeButton.svelte';
-  const bitrates = [0, 320, 192, 128, 64];
 
   // Swipe-down to dismiss. Pointer events cover touch + mouse.
   let dy = $state(0);
@@ -57,14 +55,6 @@
         onclick={() => (player.expanded = false)}
         aria-label="Close"><ChevronDown /></button
       >
-      <select
-        class="rounded-md border bg-transparent px-2 py-1 text-xs"
-        value={settings.s.maxBitRate}
-        onchange={(e) => player.setBitrate(Number(e.currentTarget.value))}
-        aria-label="Quality"
-      >
-        {#each bitrates as b}<option value={b}>{b === 0 ? 'Original' : `${b} kbps`}</option>{/each}
-      </select>
     </div>
 
     <div class="flex flex-1 flex-col items-center justify-center gap-6 px-8">

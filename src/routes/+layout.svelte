@@ -37,6 +37,10 @@
     else if (e.key === 'Escape') player.expanded = false;
   }
 
+  // Height of the floating mobile stack (mini player + tab bar + safe area).
+  // Exposed as --bottom-stack so page-level floating buttons can sit above it.
+  let stackH = $state(0);
+
   // Scroll restoration for <main> (inner scroller — SvelteKit only restores window scroll)
   let mainEl = $state<HTMLElement | null>(null);
   const scrollPos = new Map<string, number>();
@@ -68,9 +72,9 @@
       </div>
     </aside>
 
-    <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+    <div class="relative flex min-h-0 min-w-0 flex-1 flex-col" style="--bottom-stack: {stackH}px">
       <!-- mobile: leave room under content for the floating stack -->
-      <main bind:this={mainEl} class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pt-safe {player.current ? 'pb-44' : 'pb-24'} md:pb-0">
+      <main bind:this={mainEl} class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pt-safe {player.current ? 'pb-52' : 'pb-32'} md:pb-0">
         {@render children()}
       </main>
 
@@ -78,14 +82,14 @@
       <div class="hidden md:block"><MiniPlayer /></div>
 
       <!-- mobile: floating mini player + pill tab bar -->
-      <div class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 48px)">
+      <div bind:clientHeight={stackH} class="pointer-events-none absolute inset-x-0 bottom-0 z-40 md:hidden" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 48px)">
         <div class="pointer-events-auto mx-3 flex flex-col items-center gap-1.5">
           <div class="w-full"><MiniPlayer floating /></div>
-          <nav class="flex items-center gap-1 rounded-full border bg-card/80 p-1 shadow-lg backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
+          <nav class="flex items-center gap-1 rounded-full border bg-card/80 p-1.5 shadow-lg backdrop-blur-xl supports-[backdrop-filter]:bg-card/70">
             {#each mobileNav as n}
               <a href={n.href} aria-label={n.label} aria-current={mobileActive(n.href) ? 'page' : undefined}
-                class="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-colors {mobileActive(n.href) ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-accent'}">
-                <n.icon size={18} />{#if mobileActive(n.href)}<span>{n.label}</span>{/if}
+                class="flex min-h-11 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-colors {mobileActive(n.href) ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-accent'}">
+                <n.icon size={22} />{#if mobileActive(n.href)}<span>{n.label}</span>{/if}
               </a>
             {/each}
           </nav>
