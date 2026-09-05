@@ -48,68 +48,56 @@ External APIs: Navidrome (Subsonic/OpenSubsonic), Deezer public API (no key), lr
 
 ## Self‑hosting
 
-Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any Linux box with Docker works.
+Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any Linux box with Docker works. Images are built for `linux/amd64` and `linux/arm64` by GitHub Actions and published to `ghcr.io/ze-castro/music` — the server never needs the source.
 
 ### Requirements
 
-- Docker + Docker Compose v2.24 or newer
+- Docker + Docker Compose v2
 - A running Navidrome instance reachable from the Docker host
-- (Recommended) a reverse proxy with HTTPS — Caddy, Nginx Proxy Manager, Traefik, whatever you already run. iOS "Add to Home Screen" works over plain HTTP on your LAN but Media Session and some PWA features behave better on HTTPS.
+- (Recommended) a reverse proxy with HTTPS — Caddy, Nginx Proxy Manager, Traefik, whatever you already run. iOS "Add to Home Screen" works over plain HTTP on your LAN, but Media Session and PWA behaviour are better on HTTPS.
 
-### 1. Clone
+### 1. Get the two files
 
 ```sh
-git clone https://github.com/<you>/music.git
-cd music
+mkdir -p ~/music && cd ~/music
+curl -O https://raw.githubusercontent.com/ze-castro/music/main/deploy/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/ze-castro/music/main/deploy/.env.example
 ```
 
-### 2. Configure
+### 2. Fill `.env`
+
+| Variable         | What                                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ENCRYPTION_KEY` | 32 random bytes, base64. `openssl rand -base64 32`                                                                                       |
+| `SESSION_SECRET` | Any long random string. `openssl rand -base64 48`                                                                                        |
+| `NAVIDROME_URL`  | Navidrome address **as seen from inside Docker**, e.g. `http://192.168.1.50:4533`. Leave empty to let users type it on the login screen. |
+| `ORIGIN`         | The exact URL people will open, e.g. `https://music.example.com`. Wrong value → login silently fails (CSRF check).                       |
 
 ```sh
-cp .env.example .env
-```
-
-Fill in `.env`:
-
-| Variable         | What                                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `ENCRYPTION_KEY` | 32 random bytes, base64. `openssl rand -base64 32`                                                                                |
-| `SESSION_SECRET` | Any long random string. `openssl rand -base64 48`                                                                                 |
-| `NAVIDROME_URL`  | Your Navidrome address, e.g. `http://192.168.1.50:4533`. Leave empty to let users type it on the login screen.                    |
-| `ORIGIN`         | **Prod only.** The exact URL people will open, e.g. `https://music.example.com`. Wrong value → login silently fails (CSRF check). |
-
-One‑liner for the two secrets:
-
-```sh
-sed -i '' "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env   # macOS
-sed -i    "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env   # Linux
+sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
+sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 48)|" .env
 ```
 
 **Do not lose `ENCRYPTION_KEY`.** It decrypts every stored Navidrome password. Rotate it and everyone has to log in again.
 
 ### 3. Run
 
-Two compose files: `docker-compose.yml` is the dev default (HTTP on localhost, Postgres reachable from the host on `127.0.0.1:5432` only); `docker-compose.prod.yml` layers the production overrides (secure cookies, `ORIGIN`, Postgres not exposed at all).
-
-**Dev / try it on your laptop**
-
 ```sh
-docker compose up -d --build
+docker compose up -d
 ```
 
-→ http://localhost:47213
+The app listens on host port **47213**. Point your reverse proxy at `http://<server-ip>:47213`. Postgres is not exposed. Database migrations run automatically on container start.
 
-**Production / home server**
+### 4. Update
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose pull && docker compose up -d
+docker image prune -f        # drop the old image
 ```
 
-The app listens on host port **47213**. Point your reverse proxy at `http://<server-ip>:47213`.
+Pin a version instead of `latest` by changing the image tag in `docker-compose.yml` to e.g. `ghcr.io/ze-castro/music:v1.0.0` (tags match git tags) or a short commit SHA.
 
-Database migrations run automatically on container start.
-
-### 4. Reverse proxy example (Caddy)
+### 5. Reverse proxy example (Caddy)
 
 ```
 music.example.com {
@@ -117,11 +105,30 @@ music.example.com {
 }
 ```
 
-Then set `ORIGIN=https://music.example.com` in `.env` and re‑run the prod compose command. Compose picks up `.env` changes on `up -d` — no rebuild needed.
+Set `ORIGIN=https://music.example.com` in `.env`, then `docker compose up -d` — no image rebuild needed for env changes.
 
-### 5. Install on iPhone / Mac
+### 6. Install on iPhone / Mac
 
 Open the URL in **Safari** (not Chrome) → Share → **Add to Home Screen** (iOS) or **Add to Dock** (macOS Sonoma+). Log in with your Navidrome username and password.
+
+### Same‑host Navidrome
+
+If Navidrome runs in Docker on the same machine, join its network and use the container name:
+
+```yaml
+# deploy/docker-compose.yml
+services:
+  ui:
+    networks: [default, navidrome]
+networks:
+  navidrome:
+    external: true
+    name: navidrome_default # docker network ls to find it
+```
+
+```
+NAVIDROME_URL=http://navidrome:4533
+```
 
 ### Useful commands
 
@@ -130,29 +137,27 @@ docker compose logs -f ui           # app logs
 docker compose logs -f db           # postgres
 docker compose ps                   # status
 docker compose up -d                # apply .env changes
-docker compose up -d --build        # after pulling new code
 docker compose down                 # stop (data in `pgdata` volume survives)
 ```
 
-### Same‑host Navidrome
+### Building the image yourself
 
-If Navidrome runs in Docker on the same machine, put both on one network and use the container name:
-
-```yaml
-# in docker-compose.prod.yml, under ui:
-networks: [navidrome_default]
-```
-
-```
-NAVIDROME_URL=http://navidrome:4533
-```
+Fork → GitHub Actions runs `.github/workflows/docker.yml` on every push to `main` and publishes `ghcr.io/<you>/music`. Make the package public in GitHub → Packages → package settings, or `docker login ghcr.io` on the server with a PAT that has `read:packages`. Then change the `image:` line in your compose file.
 
 ---
 
-## Local development (no Docker for the app)
+## Local development
+
+Repo‑root `docker-compose.yml` builds from source (HTTP, non‑secure cookies, Postgres on `127.0.0.1:5432` for `bun dev`).
 
 ```sh
-cp .env.example .env            # fill secrets, DATABASE_URL=postgres://music:music@localhost:5432/music
+cp .env.example .env            # fill secrets
+docker compose up -d --build    # everything in Docker → http://localhost:47213
+```
+
+or run the app on the host:
+
+```sh
 docker compose up -d db         # just Postgres
 bun install
 bun run db:migrate
