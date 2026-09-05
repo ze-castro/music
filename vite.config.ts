@@ -14,7 +14,7 @@ export default defineConfig({
         short_name: 'Music',
         description: 'Clean client for Navidrome',
         start_url: '/',
-        display: 'standalone',
+        display: 'fullscreen',
         background_color: '#0a0808',
         theme_color: '#0a0808',
         icons: [
