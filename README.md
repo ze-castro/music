@@ -80,7 +80,6 @@ Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any 
 mkdir -p ~/music && cd ~/music
 curl -O https://raw.githubusercontent.com/ze-castro/music/main/deploy/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/ze-castro/music/main/deploy/.env.example
-cp .env.example .env
 ```
 
 ### 2. Fill `.env`
