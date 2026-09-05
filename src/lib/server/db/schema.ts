@@ -1,16 +1,9 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  integer,
-  bigint,
-  boolean,
-  jsonb,
-  index,
-  uniqueIndex,
-} from 'drizzle-orm/pg-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
-export const users = pgTable(
+const now = () => new Date();
+const ts = (name: string) => integer(name, { mode: 'timestamp_ms' });
+
+export const users = sqliteTable(
   'users',
   {
     id: text('id').primaryKey(),
@@ -18,26 +11,28 @@ export const users = pgTable(
     username: text('username').notNull(),
     // AES-256-GCM encrypted Subsonic password. Needed to derive fresh salt+token per request.
     encryptedSecret: text('encrypted_secret').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    homeScreenHintDismissed: boolean('home_screen_hint_dismissed').default(false).notNull(),
+    createdAt: ts('created_at').$defaultFn(now).notNull(),
+    homeScreenHintDismissed: integer('home_screen_hint_dismissed', { mode: 'boolean' })
+      .default(false)
+      .notNull(),
   },
   (t) => [uniqueIndex('users_server_username_idx').on(t.serverUrl, t.username)],
 );
 
-export const sessions = pgTable(
+export const sessions = sqliteTable(
   'sessions',
   {
     id: text('id').primaryKey(),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: ts('expires_at').notNull(),
+    createdAt: ts('created_at').$defaultFn(now).notNull(),
   },
   (t) => [index('sessions_user_idx').on(t.userId)],
 );
 
-export const listeningHistory = pgTable(
+export const listeningHistory = sqliteTable(
   'listening_history',
   {
     id: text('id').primaryKey(),
@@ -49,7 +44,7 @@ export const listeningHistory = pgTable(
     artist: text('artist').notNull(),
     artistId: text('artist_id'),
     albumId: text('album_id'),
-    playedAt: timestamp('played_at', { withTimezone: true }).defaultNow().notNull(),
+    playedAt: ts('played_at').$defaultFn(now).notNull(),
   },
   (t) => [
     index('history_user_played_idx').on(t.userId, t.playedAt),
@@ -57,7 +52,7 @@ export const listeningHistory = pgTable(
   ],
 );
 
-export const recommendationsCache = pgTable(
+export const recommendationsCache = sqliteTable(
   'recommendations_cache',
   {
     id: text('id').primaryKey(),
@@ -65,12 +60,11 @@ export const recommendationsCache = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     kind: text('kind', { enum: ['artist', 'album', 'track'] }).notNull(),
-    // Deezer ids exceed int32
-    deezerId: bigint('deezer_id', { mode: 'number' }).notNull(),
+    deezerId: integer('deezer_id').notNull(), // SQLite ints are 64-bit
     seedArtist: text('seed_artist').notNull(),
-    payload: jsonb('payload').notNull(),
-    generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
-    dismissed: boolean('dismissed').default(false).notNull(),
+    payload: text('payload', { mode: 'json' }).notNull(),
+    generatedAt: ts('generated_at').$defaultFn(now).notNull(),
+    dismissed: integer('dismissed', { mode: 'boolean' }).default(false).notNull(),
   },
   (t) => [
     uniqueIndex('recs_user_kind_deezer_idx').on(t.userId, t.kind, t.deezerId),
@@ -79,7 +73,7 @@ export const recommendationsCache = pgTable(
 );
 
 // Discoveries the user wants to acquire later. Deezer objects, not library items.
-export const wishlist = pgTable(
+export const wishlist = sqliteTable(
   'wishlist',
   {
     id: text('id').primaryKey(),
@@ -87,9 +81,9 @@ export const wishlist = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     kind: text('kind', { enum: ['artist', 'album', 'track'] }).notNull(),
-    deezerId: bigint('deezer_id', { mode: 'number' }).notNull(),
-    payload: jsonb('payload').notNull(),
-    addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
+    deezerId: integer('deezer_id').notNull(),
+    payload: text('payload', { mode: 'json' }).notNull(),
+    addedAt: ts('added_at').$defaultFn(now).notNull(),
   },
   (t) => [
     uniqueIndex('wishlist_user_kind_deezer_idx').on(t.userId, t.kind, t.deezerId),
@@ -97,7 +91,7 @@ export const wishlist = pgTable(
   ],
 );
 
-export const lyricsCache = pgTable(
+export const lyricsCache = sqliteTable(
   'lyrics_cache',
   {
     id: text('id').primaryKey(),
@@ -107,7 +101,7 @@ export const lyricsCache = pgTable(
     // Both null = looked up, nothing found. Negative cache prevents repeat lrclib hits.
     syncedLyrics: text('synced_lyrics'),
     plainLyrics: text('plain_lyrics'),
-    fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+    fetchedAt: ts('fetched_at').$defaultFn(now).notNull(),
   },
   (t) => [uniqueIndex('lyrics_key_idx').on(t.artist, t.title, t.durationSec)],
 );

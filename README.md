@@ -2,14 +2,14 @@
 
 A self‑hosted, Apple Music–style web client for [Navidrome](https://www.navidrome.org/).
 
-Streams your own library through the Subsonic/OpenSubsonic API, adds a "For You" discovery layer powered by Deezer's public API (30‑second previews), and installs as a home‑screen web app on iPhone and Mac.
+Streams your own library through the Subsonic/OpenSubsonic API, adds a "For You" discovery layer powered by Deezer's public API (30‑second previews), and installs as a home‑screen web app on iPhone and Mac. One container, one SQLite file, nothing else to run.
 
 > **Built for macOS Safari and iOS Safari only.**
 > Layout, gestures, PWA install, Media Session and audio behaviour are tuned for those two targets and nothing else is tested. It will probably load in Chrome/Firefox/Android, but expect rough edges.
 > Everyone is free to fork this and make it work on Windows, Android, Linux desktops or anywhere else. PRs for other platforms are welcome too, as long as they don't degrade the Apple targets.
 
 > **How this was made.**
-> The entire codebase — schema, API layer, player, UI, Docker setup — was written by **Claude Fable 5.1** (Anthropic) in a chat session, from a written spec, with a human testing on a real Navidrome server and reporting bugs. Total cost: roughly **€20 in API tokens**. No line was hand‑written. Treat it accordingly: it works, it's readable, it has not been audited by a human.
+> The entire codebase — schema, API layer, player, UI, Docker setup, this README — was written by **Claude Fable 5.1** (Anthropic) in a chat session, from a written spec, with a human testing on a real Navidrome server and reporting bugs. Total cost: roughly **€35 in API tokens**. No line was hand‑written. Treat it accordingly: it works, it's readable, it has not been audited by a human.
 
 ---
 
@@ -40,7 +40,7 @@ iOS 26 has a WebKit regression ([bug 295518](https://bugs.webkit.org/show_bug.cg
 
 ## Stack
 
-SvelteKit 2 · Svelte 5 · Bun · PostgreSQL + Drizzle · Tailwind v4 (shadcn Zinc tokens) · Lucide · Docker
+SvelteKit 2 · Svelte 5 · Bun · SQLite (Bun built‑in) + Drizzle · Tailwind v4 (shadcn Zinc tokens) · Lucide · Docker
 
 External APIs: Navidrome (Subsonic/OpenSubsonic), Deezer public API (no key), lrclib.net.
 
@@ -48,7 +48,7 @@ External APIs: Navidrome (Subsonic/OpenSubsonic), Deezer public API (no key), lr
 
 ## Self‑hosting
 
-Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any Linux box with Docker works. Images are built for `linux/amd64` and `linux/arm64` by GitHub Actions and published to `ghcr.io/ze-castro/music` — the server never needs the source.
+Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any Linux box with Docker works. Images are built for `linux/amd64` and `linux/arm64` by GitHub Actions and published to `ghcr.io/zecastro/music` — the server never needs the source.
 
 ### Requirements
 
@@ -60,8 +60,8 @@ Tested on a Raspberry Pi 5 (arm64) next to an existing Navidrome container. Any 
 
 ```sh
 mkdir -p ~/music && cd ~/music
-curl -O https://raw.githubusercontent.com/ze-castro/music/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/ze-castro/music/main/deploy/.env.example
+curl -O https://raw.githubusercontent.com/zecastro/music/main/deploy/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/zecastro/music/main/deploy/.env.example
 ```
 
 ### 2. Fill `.env`
@@ -86,7 +86,7 @@ sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -base64 48)|" .env
 docker compose up -d
 ```
 
-The app listens on host port **47213**. Point your reverse proxy at `http://<server-ip>:47213`. Postgres is not exposed. Database migrations run automatically on container start.
+The app listens on host port **47213**. Point your reverse proxy at `http://<server-ip>:47213`. The SQLite database lives in `./data/` next to the compose file — that folder is the only thing to back up. Migrations run automatically on start.
 
 ### 4. Update
 
@@ -95,7 +95,7 @@ docker compose pull && docker compose up -d
 docker image prune -f        # drop the old image
 ```
 
-Pin a version instead of `latest` by changing the image tag in `docker-compose.yml` to e.g. `ghcr.io/ze-castro/music:v1.0.0` (tags match git tags) or a short commit SHA.
+Pin a version instead of `latest` by changing the image tag in `docker-compose.yml` to e.g. `ghcr.io/zecastro/music:v1.0.0` (tags match git tags) or a short commit SHA.
 
 ### 5. Reverse proxy example (Caddy)
 
@@ -111,33 +111,17 @@ Set `ORIGIN=https://music.example.com` in `.env`, then `docker compose up -d` �
 
 Open the URL in **Safari** (not Chrome) → Share → **Add to Home Screen** (iOS) or **Add to Dock** (macOS Sonoma+). Log in with your Navidrome username and password.
 
-### Same‑host Navidrome
+### Navidrome in Docker on the same host
 
-If Navidrome runs in Docker on the same machine, join its network and use the container name:
-
-```yaml
-# deploy/docker-compose.yml
-services:
-  ui:
-    networks: [default, navidrome]
-networks:
-  navidrome:
-    external: true
-    name: navidrome_default # docker network ls to find it
-```
-
-```
-NAVIDROME_URL=http://navidrome:4533
-```
+The compose file already joins a network called `navidrome_default` (the default name when Navidrome's compose lives in a folder called `navidrome`) so `NAVIDROME_URL=http://navidrome:4533` resolves. Check yours with `docker network ls` and edit the `name:` at the bottom of the file. If Navidrome is not in Docker, delete the `networks:` lines and use its LAN address.
 
 ### Useful commands
 
 ```sh
-docker compose logs -f ui           # app logs
-docker compose logs -f db           # postgres
+docker compose logs -f              # app logs
 docker compose ps                   # status
 docker compose up -d                # apply .env changes
-docker compose down                 # stop (data in `pgdata` volume survives)
+docker compose down                 # stop (./data survives)
 ```
 
 ### Building the image yourself
@@ -148,23 +132,24 @@ Fork → GitHub Actions runs `.github/workflows/docker.yml` on every push to `ma
 
 ## Local development
 
-Repo‑root `docker-compose.yml` builds from source (HTTP, non‑secure cookies, Postgres on `127.0.0.1:5432` for `bun dev`).
+Repo‑root `docker-compose.yml` builds from source (HTTP, non‑secure cookies).
 
 ```sh
 cp .env.example .env            # fill secrets
-docker compose up -d --build    # everything in Docker → http://localhost:47213
+docker compose up -d --build    # → http://localhost:47213
 ```
 
-or run the app on the host:
+or on the host, no Docker at all:
 
 ```sh
-docker compose up -d db         # just Postgres
+cp .env.example .env
 bun install
-bun run db:migrate
-bun run dev                     # http://localhost:5173
+bun run dev                     # http://localhost:5173 — SQLite file created at ./data/music.db
 ```
 
-`bun run check` for type‑checking. After editing `src/lib/server/db/schema.ts`, run `bun run db:generate` and commit the new file in `drizzle/` — migrations apply automatically on container start.
+`bun run build` must run under Bun (the script already does `bun --bun vite build`) because the SQLite driver is `bun:sqlite`.
+
+`bun run check` for type‑checking. After editing `src/lib/server/db/schema.ts`, run `bun run db:generate` and commit the new file in `drizzle/` — migrations apply automatically on start.
 
 If `bun install` complains about the lockfile version, delete `bun.lock` and reinstall — it was generated with a newer Bun.
 
@@ -174,7 +159,7 @@ If `bun install` complains about the lockfile version, delete `bun.lock` and rei
 
 ```
 src/lib/server/
-  db/schema.ts         users, sessions, listening_history, recommendations_cache, wishlist, lyrics_cache
+  db/schema.ts         users, sessions, listening_history, recommendations_cache, wishlist, lyrics_cache (SQLite)
   crypto.ts            AES‑256‑GCM for stored Navidrome passwords
   session.ts           JWT cookie → sessions row → user
   subsonic/            typed Subsonic/OpenSubsonic client, fresh salt+token per request

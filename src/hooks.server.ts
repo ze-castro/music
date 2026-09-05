@@ -1,6 +1,11 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, ServerInit } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { readSession } from '$lib/server/session';
+import { initDb } from '$lib/server/db';
+
+export const init: ServerInit = async () => {
+  await initDb();
+};
 
 const PUBLIC = new Set(['/login']);
 
@@ -10,7 +15,11 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.session = s?.session ?? null;
 
   const path = event.url.pathname;
-  const isPublic = PUBLIC.has(path) || path.startsWith('/manifest') || path.startsWith('/icon') || path.startsWith('/apple-touch');
+  const isPublic =
+    PUBLIC.has(path) ||
+    path.startsWith('/manifest') ||
+    path.startsWith('/icon') ||
+    path.startsWith('/apple-touch');
   if (!event.locals.user && !isPublic) {
     if (path.startsWith('/api/')) return new Response('unauthorized', { status: 401 });
     throw redirect(303, '/login');

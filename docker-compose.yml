@@ -1,27 +1,16 @@
-# Local development. For a server, use deploy/docker-compose.yml (pulls prebuilt image).
+# Local development (builds from source). Server: deploy/docker-compose.yml
 services:
-  ui:
-    container_name: music-ui
+  music:
+    container_name: music
     build: .
     restart: unless-stopped
-    ports: ["47213:3000"]
+    ports: ['47213:3000']
     environment:
-      DATABASE_URL: postgres://music:music@db:5432/music
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
       NAVIDROME_URL: ${NAVIDROME_URL:-}
       ORIGIN: http://localhost:47213
-      COOKIE_SECURE: "false"
-    depends_on: [db]
-  db:
-    container_name: music-db
-    image: postgres:16-alpine
-    restart: unless-stopped
-    ports: ["127.0.0.1:5432:5432"]   # host-only, for `bun dev`; not on LAN
-    environment:
-      POSTGRES_USER: music
-      POSTGRES_PASSWORD: music
-      POSTGRES_DB: music
-    volumes: [pgdata:/var/lib/postgresql/data]
+      COOKIE_SECURE: 'false'
+    volumes: [music-data:/data]
 volumes:
-  pgdata:
+  music-data:

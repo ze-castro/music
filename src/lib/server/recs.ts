@@ -4,8 +4,7 @@ import { deezer, type DeezerTrack } from './deezer/client';
 import { clientForUser } from './subsonic';
 import type { User } from './db/schema';
 
-// TEMP for testing: real value 200
-export const FOR_YOU_THRESHOLD = 5;
+export const FOR_YOU_THRESHOLD = 200;
 const SEEDS = 5; // top artists used as seeds
 const RELATED_PER_SEED = 6;
 const NEW_RELEASE_DAYS = 365;
@@ -36,7 +35,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function playCount(userId: string) {
   const [{ n }] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(schema.listeningHistory)
     .where(eq(schema.listeningHistory.userId, userId));
   return n;

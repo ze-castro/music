@@ -5,25 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "bun --bun vite build",
     "preview": "vite preview",
     "start": "bun ./build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@lucide/svelte": "^0.500.0",
     "drizzle-orm": "^0.44.0",
-    "jose": "^6.0.0",
-    "postgres": "^3.4.7"
+    "jose": "^6.0.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.2.0",
     "@sveltejs/kit": "^2.20.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/vite": "^4.1.0",
+    "@types/bun": "^1.4.1",
     "@types/node": "^26.4.1",
     "@vite-pwa/sveltekit": "^1.0.0",
     "bits-ui": "^2.0.0",

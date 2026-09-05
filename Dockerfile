@@ -1,4 +1,3 @@
-# arm64-friendly. Build + run on Bun.
 FROM oven/bun:1 AS build
 WORKDIR /app
 COPY package.json bun.lock* ./
@@ -8,12 +7,11 @@ RUN bun run build
 
 FROM oven/bun:1-slim
 WORKDIR /app
-ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0
+ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 \
+    DATABASE_URL=/data/music.db MIGRATIONS_DIR=/app/drizzle
 COPY --from=build /app/build ./build
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
-COPY --from=build /app/drizzle.config.ts ./
-COPY --from=build /app/src/lib/server/db/schema.ts ./src/lib/server/db/schema.ts
+COPY --from=build /app/package.json ./
+VOLUME /data
 EXPOSE 3000
-CMD ["sh", "-c", "bunx drizzle-kit migrate && bun ./build/index.js"]
+CMD ["bun", "./build/index.js"]
