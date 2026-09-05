@@ -12,22 +12,22 @@ export default defineConfig({
       manifest: {
         name: 'Music',
         short_name: 'Music',
-        description: 'Apple Music–style client for Navidrome',
+        description: 'Clean client for Navidrome',
         start_url: '/',
         display: 'standalone',
-        background_color: '#09090b',
-        theme_color: '#09090b',
+        background_color: '#0a0808',
+        theme_color: '#0a0808',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
-        ]
+          { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+        ],
       },
       workbox: {
         // v1: app shell only. NEVER cache audio/stream/cover routes.
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: []
-      }
-    })
-  ]
+        runtimeCaching: [],
+      },
+    }),
+  ],
 });

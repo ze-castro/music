@@ -6,11 +6,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Music" />
-    <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
-    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="%sveltekit.assets%/favicon.png" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="any" />
+    <meta name="theme-color" content="#0a0808" />
     <script>
       // Theme before paint: avoid flash. Default dark; 'light' opt-in stored in localStorage.
-      try { if (localStorage.getItem('theme') === 'light') document.documentElement.classList.remove('dark'); } catch {}
+      try {
+        if (localStorage.getItem('theme') === 'light')
+          document.documentElement.classList.remove('dark');
+      } catch {}
     </script>
     %sveltekit.head%
   </head>
