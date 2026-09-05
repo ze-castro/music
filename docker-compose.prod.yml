@@ -1,0 +1,5 @@
+services:
+  ui:
+    environment:
+      ORIGIN: ${ORIGIN}
+      COOKIE_SECURE: "true"
