@@ -60,7 +60,7 @@
 <svelte:window onkeydown={onKey} />
 
 {#if data.user}
-  <div class="fixed inset-0 flex flex-col overflow-hidden md:flex-row">
+  <div class="fixed inset-0 flex flex-col overflow-hidden bg-background md:flex-row">
     <aside
       class="hidden md:flex w-56 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground pt-safe"
     >
