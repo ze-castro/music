@@ -9,7 +9,7 @@ Streams your own library through the Subsonic/OpenSubsonic API, adds a "For You"
 > Everyone is free to fork this and make it work on Windows, Android, Linux desktops or anywhere else. PRs for other platforms are welcome too, as long as they don't degrade the Apple targets.
 
 > **How this was made.**
-> The entire codebase — schema, API layer, player, UI, Docker setup, this README — was written by **Claude Fable 5.1** (Anthropic) in a chat session, from a written spec, with a human testing on a real Navidrome server and reporting bugs. Total cost: roughly **€35 in API tokens**. No line was hand‑written. Treat it accordingly: it works, it's readable, it has not been audited by a human.
+> The entire codebase — schema, API layer, player, UI, Docker setup, this README — was written by **Claude Fable 5.1** (Anthropic) in a chat session, from a written spec, with a human testing on a real Navidrome server and reporting bugs. Total cost: roughly **€50 in API tokens**. No line was hand‑written. Treat it accordingly: it works, it's readable, it has not been audited by a human.
 
 ---
 
