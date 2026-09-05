@@ -60,7 +60,7 @@
 <svelte:window onkeydown={onKey} />
 
 {#if data.user}
-  <div class="flex h-dvh flex-col overflow-hidden md:flex-row">
+  <div class="fixed inset-0 flex flex-col overflow-hidden md:flex-row">
     <aside
       class="hidden md:flex w-56 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground pt-safe"
     >
@@ -98,11 +98,11 @@
         {@render children()}
       </main>
       <MiniPlayer />
-      <nav class="md:hidden flex shrink-0 border-t bg-sidebar pb-safe">
+      <nav class="md:hidden flex shrink-0 border-t bg-sidebar">
         {#each mobileNav as n}
           <a
             href={n.href}
-            class="flex flex-1 flex-col items-center gap-0.5 pt-1.5 pb-1 text-[10px] {mobileActive(
+            class="flex flex-1 flex-col items-center gap-0.5 pt-2 pb-2 text-[10px] {mobileActive(
               n.href,
             )
               ? 'text-foreground'

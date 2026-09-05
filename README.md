@@ -1,6 +1,6 @@
 # Music
 
-A self‑hosted, Apple Music–style web client for [Navidrome](https://www.navidrome.org/).
+A self‑hosted, modern and clean web client for [Navidrome](https://www.navidrome.org/).
 
 Streams your own library through the Subsonic/OpenSubsonic API, adds a "For You" discovery layer powered by Deezer's public API (30‑second previews), and installs as a home‑screen web app on iPhone and Mac. One container, one SQLite file, nothing else to run.
 
