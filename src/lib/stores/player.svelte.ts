@@ -17,8 +17,6 @@ class Player {
   current = $derived(this.index >= 0 ? (this.queue[this.index] ?? null) : null);
 
   #audio: HTMLAudioElement | null = null;
-  #ctx: AudioContext | null = null;
-  #gain: GainNode | null = null;
   #scrobbled = false;
   #history: number[] = [];
 
@@ -82,7 +80,6 @@ class Player {
     const a = this.#el();
     a.src = this.streamUrl(this.queue[i]);
     a.load();
-    this.#applyGain(this.queue[i]);
     if (autoplay)
       a.play().catch((e) => {
         this.error = `Couldn't start playback: ${e?.message ?? e}`;
@@ -154,34 +151,6 @@ class Player {
   }
   cycleRepeat() {
     this.repeat = this.repeat === 'off' ? 'all' : this.repeat === 'all' ? 'one' : 'off';
-  }
-
-  /** Web Audio gain chain. Created lazily inside a user gesture (iOS). */
-  #ensureGraph() {
-    if (this.#gain || !this.#audio) return;
-    try {
-      this.#ctx = new AudioContext();
-      const src = this.#ctx.createMediaElementSource(this.#audio);
-      this.#gain = this.#ctx.createGain();
-      src.connect(this.#gain).connect(this.#ctx.destination);
-    } catch {
-      this.#ctx = null;
-      this.#gain = null;
-    }
-  }
-  #applyGain(t: Track | undefined) {
-    if (!settings.s.normalize) {
-      if (this.#gain) this.#gain.gain.value = 1;
-      return;
-    }
-    this.#ensureGraph();
-    if (!this.#gain) return;
-    this.#ctx?.resume().catch(() => {});
-    const db = t?.trackGain ?? t?.albumGain ?? 0;
-    this.#gain.gain.value = Math.min(2, Math.max(0.1, Math.pow(10, db / 20)));
-  }
-  refreshGain() {
-    this.#applyGain(this.current ?? undefined);
   }
 
   setBitrate(kbps: number) {

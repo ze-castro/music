@@ -11,8 +11,6 @@ export interface Track {
   track?: number;
   discNumber?: number;
   starred?: boolean;
-  trackGain?: number; // ReplayGain dB, from OpenSubsonic
-  albumGain?: number;
   created?: string;
   playCount?: number;
 }

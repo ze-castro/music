@@ -47,10 +47,6 @@
         <input type="checkbox" class="h-5 w-5 accent-foreground" checked={settings.s.gapless} onchange={(e) => settings.set('gapless', e.currentTarget.checked)} />
       </label>
       <label class="flex items-center justify-between px-4 py-3">
-        <span>Normalize loudness<span class="block text-xs text-muted-foreground">Uses ReplayGain tags from your files</span></span>
-        <input type="checkbox" class="h-5 w-5 accent-foreground" checked={settings.s.normalize} onchange={(e) => { settings.set('normalize', e.currentTarget.checked); player.refreshGain(); }} />
-      </label>
-      <label class="flex items-center justify-between px-4 py-3">
         <span>Streaming quality<span class="block text-xs text-muted-foreground">Lower saves data on mobile</span></span>
         <select class="rounded-md border bg-transparent px-2 py-1 text-sm" value={settings.s.maxBitRate} onchange={(e) => player.setBitrate(Number(e.currentTarget.value))}>
           {#each bitrates as [v, label]}<option value={v}>{label}</option>{/each}

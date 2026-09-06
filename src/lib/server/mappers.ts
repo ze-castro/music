@@ -13,8 +13,6 @@ export const toTrack = (s: Child, fallbackCover?: string): Track => ({
   track: s.track,
   discNumber: s.discNumber,
   starred: !!s.starred,
-  trackGain: s.replayGain?.trackGain,
-  albumGain: s.replayGain?.albumGain,
   created: s.created,
   playCount: s.playCount ?? 0,
 });

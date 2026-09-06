@@ -3,10 +3,9 @@ import { browser } from '$app/environment';
 export interface Settings {
   theme: 'dark' | 'light';
   gapless: boolean; // preload next track
-  normalize: boolean; // apply ReplayGain track gain via Web Audio
   maxBitRate: number; // 0 = original
 }
-const DEFAULTS: Settings = { theme: 'dark', gapless: true, normalize: false, maxBitRate: 0 };
+const DEFAULTS: Settings = { theme: 'dark', gapless: true, maxBitRate: 0 };
 const KEY = 'music.settings';
 
 function load(): Settings {
