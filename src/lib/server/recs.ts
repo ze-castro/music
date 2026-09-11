@@ -67,7 +67,7 @@ export function isStale(generatedAt: Date | null) {
 /** Pipeline: history → seeds → Deezer related/albums → filter vs library → cache. Deezer failures throw; caller falls back to cache. */
 export async function generateRecs(user: User) {
   const seeds = await db
-    .select({ artist: schema.listeningHistory.artist, n: sql<number>`count(*)::int` })
+    .select({ artist: schema.listeningHistory.artist, n: sql<number>`count(*)` })
     .from(schema.listeningHistory)
     .where(eq(schema.listeningHistory.userId, user.id))
     .groupBy(schema.listeningHistory.artist)

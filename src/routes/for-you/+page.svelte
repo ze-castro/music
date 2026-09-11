@@ -184,9 +184,9 @@
       <p class="mt-1">{data.plays} of {data.threshold} plays so far.</p>
     </div>
   {:else}
-    {#if data.deezerError}
+    {#if data.recsError}
       <p class="mb-4 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive">
-        Couldn't refresh suggestions ({data.deezerError}). Showing last known.
+        Couldn't refresh suggestions ({data.recsError}). Showing last known.
       </p>
     {/if}
     <p class="mb-6 text-xs text-muted-foreground">
