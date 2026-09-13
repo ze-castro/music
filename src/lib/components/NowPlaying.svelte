@@ -38,7 +38,7 @@
 
 {#if player.expanded && player.current}
   <div
-    class="fixed inset-0 z-50 flex flex-col bg-background pt-safe pb-safe touch-none select-none"
+    class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background pt-safe pb-safe touch-none select-none"
     role="dialog"
     aria-label="Now playing"
     style:transform="translateY({dy}px)"
@@ -57,8 +57,13 @@
       >
     </div>
 
-    <div class="flex flex-1 flex-col items-center justify-center gap-6 px-8">
-      <div class="w-full max-w-sm" style:view-transition-name="now-playing-art">
+    <div
+      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-8 pb-4 sm:gap-5"
+    >
+      <div
+        class="w-[min(100%,24rem,42svh)] min-w-[10rem] shrink-0"
+        style:view-transition-name="now-playing-art"
+      >
         <Artwork
           coverArt={player.current.coverArt}
           name={player.current.album ?? player.current.title}
@@ -66,7 +71,7 @@
           class="rounded-xl shadow-2xl"
         />
       </div>
-      <div class="flex w-full max-w-sm items-center gap-2">
+      <div class="flex w-full max-w-sm shrink-0 items-center gap-2">
         <div class="min-w-0 flex-1">
           <div class="truncate text-lg font-semibold">{player.current.title}</div>
           {#if player.current.artistId}
@@ -82,7 +87,7 @@
         <LikeButton track={player.current} size={22} />
       </div>
 
-      <div class="w-full max-w-sm">
+      <div class="w-full max-w-sm shrink-0">
         <input
           type="range"
           min="0"
@@ -100,7 +105,7 @@
         </div>
       </div>
 
-      <div class="flex w-full max-w-sm items-center justify-between">
+      <div class="flex w-full max-w-sm shrink-0 items-center justify-between">
         <button
           class="grid h-10 w-10 place-items-center rounded-full {player.shuffle
             ? 'text-foreground'
