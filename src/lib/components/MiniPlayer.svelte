@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Pause, SkipForward, SkipBack } from '@lucide/svelte';
+  import { Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX } from '@lucide/svelte';
   import { player } from '$lib/stores/player.svelte';
   import Artwork from './Artwork.svelte';
   // floating = mobile pill (matches tab bar); docked = desktop full-width bar
@@ -8,6 +8,9 @@
   // progress ring: r=19 → circumference ≈ 119.4
   const C = 2 * Math.PI * 19;
   const dash = $derived(C * (1 - pct / 100));
+  const VolIcon = $derived(
+    player.muted || player.volume === 0 ? VolumeX : player.volume < 0.5 ? Volume1 : Volume2,
+  );
   let startY = 0;
   function tstart(e: TouchEvent) {
     startY = e.touches[0].clientY;
@@ -137,6 +140,26 @@
             onclick={() => player.next()}
             aria-label="Next"><SkipForward size={18} /></button
           >
+        </div>
+        <!-- volume: desktop only — iOS/Safari ignores audio.volume (hardware buttons only) -->
+        <div class="hidden items-center gap-1.5 pl-2 md:flex">
+          <button
+            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent"
+            onclick={() => player.toggleMute()}
+            aria-label={player.muted ? 'Unmute' : 'Mute'}
+          >
+            <VolIcon size={18} />
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={player.muted ? 0 : player.volume}
+            oninput={(e) => player.setVolume(e.currentTarget.valueAsNumber)}
+            class="w-24 accent-foreground"
+            aria-label="Volume"
+          />
         </div>
       </div>
       {#if player.error}

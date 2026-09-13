@@ -13,6 +13,8 @@ class Player {
   repeat = $state<RepeatMode>('off');
   error = $state<string | null>(null);
   expanded = $state(false);
+  volume = $state(settings.s.volume);
+  muted = $state(settings.s.muted);
 
   current = $derived(this.index >= 0 ? (this.queue[this.index] ?? null) : null);
 
@@ -24,6 +26,8 @@ class Player {
     if (this.#audio) return this.#audio;
     const a = new Audio();
     a.preload = 'auto';
+    a.volume = this.volume;
+    a.muted = this.muted;
     a.addEventListener('timeupdate', () => {
       this.currentTime = a.currentTime;
       this.#maybeScrobble();
@@ -151,6 +155,21 @@ class Player {
   }
   cycleRepeat() {
     this.repeat = this.repeat === 'off' ? 'all' : this.repeat === 'all' ? 'one' : 'off';
+  }
+
+  setVolume(v: number) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.volume > 0) this.muted = false;
+    const a = this.#el();
+    a.volume = this.volume;
+    a.muted = this.muted;
+    settings.set('volume', this.volume);
+    settings.set('muted', this.muted);
+  }
+  toggleMute() {
+    this.muted = !this.muted;
+    this.#el().muted = this.muted;
+    settings.set('muted', this.muted);
   }
 
   setBitrate(kbps: number) {
