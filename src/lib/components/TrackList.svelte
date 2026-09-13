@@ -12,12 +12,14 @@
     showArt = true,
     numbered = false,
     context = 'list',
+    albumArtist,
   }: {
     tracks: Track[];
     queue?: Track[];
     showArt?: boolean;
     numbered?: boolean;
     context?: 'list' | 'album';
+    albumArtist?: string;
   } = $props();
   const play = (t: Track, i: number) =>
     player.playQueue(queue, queue === tracks ? i : queue.indexOf(t));
@@ -25,6 +27,8 @@
 
 <ol class="divide-y">
   {#each tracks as t, i (t.id + i)}
+    {@const showArtist = context !== 'album' || (!!t.artist && t.artist !== albumArtist)}
+    {@const showAlbum = context !== 'album' && !!t.album}
     <li
       class="flex items-center gap-3 px-2 py-2 hover:bg-accent/60 {player.current?.id === t.id
         ? 'bg-accent'
@@ -47,19 +51,23 @@
         <button onclick={() => play(t, i)} class="block w-full truncate text-left text-sm"
           >{t.title}</button
         >
-        <div class="truncate text-xs text-muted-foreground">
-          {#if t.artistId}<a
-              href="/artists/{t.artistId}"
-              class="hover:underline hover:text-foreground">{t.artist}</a
-            >{:else}{t.artist}{/if}
-          {#if context !== 'album' && t.album}
-            <span aria-hidden="true"> · </span>
-            {#if t.albumId}<a
-                href="/albums/{t.albumId}"
-                class="hover:underline hover:text-foreground">{t.album}</a
-              >{:else}{t.album}{/if}
-          {/if}
-        </div>
+        {#if showArtist || showAlbum}
+          <div class="truncate text-xs text-muted-foreground">
+            {#if showArtist}
+              {#if t.artistId}
+                <a href="/artists/{t.artistId}" class="hover:underline hover:text-foreground"
+                  >{t.artist}</a
+                >{:else}{t.artist}{/if}
+            {/if}
+            {#if showAlbum}
+              {#if showArtist}<span aria-hidden="true"> · </span>{/if}
+              {#if t.albumId}
+                <a href="/albums/{t.albumId}" class="hover:underline hover:text-foreground"
+                  >{t.album}</a
+                >{:else}{t.album}{/if}
+            {/if}
+          </div>
+        {/if}
       </div>
       <LikeButton track={t} />
       <button onclick={() => play(t, i)} class="text-xs tabular-nums text-muted-foreground"

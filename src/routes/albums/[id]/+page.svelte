@@ -53,6 +53,6 @@
   </div>
 
   <div class="mt-6">
-    <TrackList tracks={data.tracks} numbered showArt={false} context="album" />
+    <TrackList tracks={data.tracks} numbered showArt={false} context="album" albumArtist={data.album.artist} />
   </div>
 </div>
