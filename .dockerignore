@@ -1,0 +1,12 @@
+.git
+.github
+.svelte-kit
+node_modules
+build
+.env
+.env.*
+!.env.example
+deploy
+README.md
+Dockerfile
+docker-compose.yml

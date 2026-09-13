@@ -5,7 +5,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1-slim
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS build
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 \
     DATABASE_URL=/data/music.db MIGRATIONS_DIR=/app/drizzle
