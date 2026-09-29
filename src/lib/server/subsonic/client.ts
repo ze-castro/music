@@ -32,6 +32,10 @@ const CLIENT_NAME = 'music';
 const API_VERSION = '1.16.1';
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+type Param = string | number | boolean | undefined;
+// Arrays become repeated keys (songId=a&songId=b), as Subsonic expects.
+type Params = Record<string, Param | Param[]>;
+
 export interface SubsonicCredentials {
   serverUrl: string;
   username: string;
@@ -78,18 +82,17 @@ export class SubsonicClient {
   }
 
   /** Build URL for an endpoint. Used both for JSON calls and binary (stream/cover) proxying. */
-  async url(
-    endpoint: string,
-    params: Record<string, string | number | boolean | undefined> = {},
-  ): Promise<string> {
+  async url(endpoint: string, params: Params = {}): Promise<string> {
     const qs = await this.authParams();
-    for (const [k, v] of Object.entries(params)) if (v !== undefined) qs.append(k, String(v));
+    for (const [k, v] of Object.entries(params)) {
+      for (const item of Array.isArray(v) ? v : [v]) if (item !== undefined) qs.append(k, String(item));
+    }
     return `${this.creds.serverUrl}/rest/${endpoint}?${qs}`;
   }
 
   private async call<T>(
     endpoint: string,
-    params: Record<string, string | number | boolean | undefined> = {},
+    params: Params = {},
   ): Promise<SubsonicEnvelope<T>['subsonic-response']> {
     const url = await this.url(endpoint, params);
     const ctrl = new AbortController();
@@ -122,12 +125,12 @@ export class SubsonicClient {
   /** Binary fetch (stream / coverArt). Returns raw Response for proxying. */
   async fetchBinary(
     endpoint: string,
-    params: Record<string, string | number | undefined>,
-    headers?: HeadersInit,
+    params: Params,
+    init: { headers?: HeadersInit; signal?: AbortSignal } = {},
   ): Promise<Response> {
     const url = await this.url(endpoint, params);
     try {
-      return await fetch(url, { headers });
+      return await fetch(url, init);
     } catch (e) {
       throw new SubsonicNetworkError('unreachable', e);
     }
@@ -239,24 +242,20 @@ export class SubsonicClient {
     return (await this.call<{ playlist: Playlist }>('getPlaylist', { id })).playlist;
   }
   async createPlaylist(name: string, songIds: string[] = []): Promise<Playlist> {
-    const url = await this.url('createPlaylist', { name });
-    const qs = songIds.map((s) => `&songId=${encodeURIComponent(s)}`).join('');
-    const res = await fetch(url + qs);
-    const body = (await res.json()) as SubsonicEnvelope<{ playlist: Playlist }>;
-    return body['subsonic-response'].playlist;
+    const r = await this.call<{ playlist: Playlist }>('createPlaylist', { name, songId: songIds });
+    return r.playlist;
   }
   async updatePlaylist(
     playlistId: string,
     opts: { name?: string; comment?: string; add?: string[]; removeIndexes?: number[] },
-  ) {
-    let url = await this.url('updatePlaylist', {
+  ): Promise<void> {
+    await this.call('updatePlaylist', {
       playlistId,
       name: opts.name,
       comment: opts.comment,
+      songIdToAdd: opts.add,
+      songIndexToRemove: opts.removeIndexes,
     });
-    url += (opts.add ?? []).map((s) => `&songIdToAdd=${encodeURIComponent(s)}`).join('');
-    url += (opts.removeIndexes ?? []).map((i) => `&songIndexToRemove=${i}`).join('');
-    await fetch(url);
   }
   deletePlaylist(id: string) {
     return this.call('deletePlaylist', { id });
@@ -276,11 +275,15 @@ export class SubsonicClient {
 
   // ---- binary ----
   /** maxBitRate=0 or undefined → original / server default. format='raw' bypasses transcoding. */
-  stream(id: string, opts: { maxBitRate?: number; format?: string } = {}, headers?: HeadersInit) {
+  stream(
+    id: string,
+    opts: { maxBitRate?: number; format?: string } = {},
+    init: { headers?: HeadersInit; signal?: AbortSignal } = {},
+  ) {
     return this.fetchBinary(
       'stream',
       { id, maxBitRate: opts.maxBitRate, format: opts.format, estimateContentLength: 'true' },
-      headers,
+      init,
     );
   }
   coverArt(id: string, size?: number) {

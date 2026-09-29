@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart, Plus, MoreHorizontal, Pencil, Trash2 } from '@lucide/svelte';
+  import { Heart, Plus, MoreHorizontal, Pencil, PencilLine, Trash2 } from '@lucide/svelte';
   import { enhance } from '$app/forms';
   import Artwork from '$lib/components/Artwork.svelte';
   import ListHeader from '$lib/components/ListHeader.svelte';
@@ -34,6 +34,15 @@
   let submitting = $state(false);
   let menuFor = $state<string | null>(null);
   let confirmDelete = $state<{ id: string; name: string } | null>(null);
+  let renaming = $state<{ id: string; name: string } | null>(null);
+  let renameValue = $state('');
+  let renameError = $state<string | null>(null);
+
+  function openRename(p: { id: string; name: string }) {
+    renaming = p;
+    renameValue = p.name;
+    renameError = null;
+  }
 
   function openCreate() {
     newName = '';
@@ -113,6 +122,15 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   menuFor = null;
+                  openRename(p);
+                }}
+                class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent"
+                role="menuitem"><PencilLine size={14} />Rename</button
+              >
+              <button
+                onclick={(e) => {
+                  e.stopPropagation();
+                  menuFor = null;
                   confirmDelete = { id: p.id, name: p.name };
                 }}
                 class="flex w-full items-center gap-2 px-3 py-2 text-left text-destructive hover:bg-accent"
@@ -182,6 +200,66 @@
           disabled={submitting || !newName.trim()}
           class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >{submitting ? 'Creating…' : 'Create'}</button
+        >
+      </div>
+    </form>
+  </div>
+{/if}
+
+{#if renaming}
+  <div
+    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Rename playlist"
+  >
+    <form
+      method="POST"
+      action="?/rename"
+      use:enhance={() => {
+        submitting = true;
+        renameError = null;
+        return async ({ result, update }) => {
+          submitting = false;
+          if (result.type === 'failure') {
+            const r = result.data?.rename as { message?: string } | undefined;
+            renameError = r?.message ?? 'Rename failed.';
+            return;
+          }
+          renaming = null;
+          await update();
+        };
+      }}
+      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl"
+    >
+      <input type="hidden" name="id" value={renaming.id} />
+      <h2 class="mb-3 text-lg font-semibold">Rename playlist</h2>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        name="name"
+        bind:value={renameValue}
+        autofocus
+        onfocus={(e) => e.currentTarget.select()}
+        maxlength={200}
+        autocomplete="off"
+        placeholder="Playlist name"
+        aria-invalid={renameError ? true : undefined}
+        class="h-10 w-full rounded-md border bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {#if renameError}
+        <p class="mt-2 text-xs text-destructive" role="alert">{renameError}</p>
+      {/if}
+      <div class="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onclick={() => (renaming = null)}
+          class="h-9 rounded-md border px-4 text-sm hover:bg-accent">Cancel</button
+        >
+        <button
+          type="submit"
+          disabled={submitting || !renameValue.trim() || renameValue.trim() === renaming.name}
+          class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >{submitting ? 'Saving…' : 'Save'}</button
         >
       </div>
     </form>

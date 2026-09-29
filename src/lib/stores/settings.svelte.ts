@@ -2,12 +2,11 @@ import { browser } from '$app/environment';
 
 export interface Settings {
   theme: 'dark' | 'light';
-  gapless: boolean; // preload next track
   maxBitRate: number; // 0 = original
   volume: number; // 0–1, desktop only (iOS ignores HTMLAudioElement.volume)
   muted: boolean;
 }
-const DEFAULTS: Settings = { theme: 'dark', gapless: true, maxBitRate: 0, volume: 1, muted: false };
+const DEFAULTS: Settings = { theme: 'dark', maxBitRate: 0, volume: 1, muted: false };
 const KEY = 'music.settings';
 
 function load(): Settings {

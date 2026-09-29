@@ -40,6 +40,7 @@
   <div
     class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background pt-safe pb-safe touch-none select-none"
     role="dialog"
+    tabindex="-1"
     aria-label="Now playing"
     style:transform="translateY({dy}px)"
     style:transition={dragging ? 'none' : 'transform 200ms ease-out'}

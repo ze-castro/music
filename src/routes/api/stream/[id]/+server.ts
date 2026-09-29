@@ -13,8 +13,15 @@ export const GET: RequestHandler = async ({ params, url, request, locals }) => {
 
   let upstream: Response;
   try {
-    upstream = await client.stream(params.id, { maxBitRate: maxBitRate ? Number(maxBitRate) : undefined, format }, headers);
+    // Tie upstream to the browser request: when the player skips, Safari drops the old
+    // connection and Navidrome stops transcoding instead of competing with the next track.
+    upstream = await client.stream(
+      params.id,
+      { maxBitRate: maxBitRate ? Number(maxBitRate) : undefined, format },
+      { headers, signal: request.signal },
+    );
   } catch (e) {
+    if (request.signal.aborted) return new Response(null, { status: 499 });
     if (e instanceof SubsonicNetworkError) return new Response('upstream unreachable', { status: 502 });
     throw e;
   }

@@ -21,6 +21,9 @@ class Player {
   #audio: HTMLAudioElement | null = null;
   #scrobbled = false;
   #history: number[] = [];
+  // Bumped on every track change; async callbacks from an older load compare against it.
+  #loadId = 0;
+  #errorTimer: ReturnType<typeof setTimeout> | undefined;
 
   #el(): HTMLAudioElement {
     if (this.#audio) return this.#audio;
@@ -33,7 +36,8 @@ class Player {
       this.#maybeScrobble();
     });
     a.addEventListener('durationchange', () => {
-      this.duration = a.duration;
+      // Transcoded streams can report Infinity/NaN; fall back to the tag duration.
+      this.duration = Number.isFinite(a.duration) ? a.duration : (this.current?.duration ?? 0);
     });
     a.addEventListener('play', () => {
       this.playing = true;
@@ -42,14 +46,18 @@ class Player {
     a.addEventListener('pause', () => {
       this.playing = false;
     });
-    a.addEventListener('ended', () => this.next(true));
-    a.addEventListener('error', () => {
-      this.error = `Playback failed for “${this.current?.title ?? 'track'}”`;
-      this.playing = false;
-      setTimeout(() => {
-        if (this.error) this.next(true);
-      }, 1500);
+    // `a.ended` is false if this event belongs to a source we already replaced.
+    a.addEventListener('ended', () => {
+      if (a.ended) this.next(true);
     });
+    // iOS Safari: with transcoding, Navidrome's estimated Content-Length can be larger than
+    // the real stream. Safari then waits for bytes that never come and `ended` never fires.
+    const advanceIfStuckAtEnd = () => {
+      if (this.#stuckAtEnd()) this.next(true);
+    };
+    a.addEventListener('stalled', advanceIfStuckAtEnd);
+    a.addEventListener('waiting', advanceIfStuckAtEnd);
+    a.addEventListener('error', () => this.#onError());
     this.#audio = a;
     return a;
   }
@@ -78,32 +86,56 @@ class Player {
 
   #load(i: number, autoplay: boolean) {
     if (i < 0 || i >= this.queue.length) return;
+    const id = ++this.#loadId;
+    clearTimeout(this.#errorTimer);
+    const t = this.queue[i];
     this.index = i;
     this.error = null;
     this.#scrobbled = false;
+    this.currentTime = 0;
+    this.duration = t.duration ?? 0;
+
     const a = this.#el();
-    a.src = this.streamUrl(this.queue[i]);
-    a.load();
-    if (autoplay)
-      a.play().catch((e) => {
-        this.error = `Couldn't start playback: ${e?.message ?? e}`;
+    const url = new URL(this.streamUrl(t), location.href).href;
+    // Assigning a new src already starts loading; an extra load() makes Safari abort and re-request.
+    if (a.src !== url) a.src = url;
+    else a.load(); // same track again (repeat-one, prev at queue start, retry after error)
+
+    if (autoplay) {
+      a.play().catch((e: unknown) => {
+        // AbortError = interrupted by a newer load (fast skipping). Expected, not a failure.
+        if (id !== this.#loadId) return;
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        this.error = `Couldn't start playback: ${e instanceof Error ? e.message : String(e)}`;
+        this.playing = false;
       });
-    if (settings.s.gapless) this.#preloadNext();
+    }
   }
 
-  #preloadNext() {
-    const n = this.#nextIndex();
-    if (n === null) return;
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'audio';
-    link.href = this.streamUrl(this.queue[n]);
-    document.head.appendChild(link);
-    setTimeout(() => link.remove(), 60_000);
+  #onError() {
+    const a = this.#audio;
+    // load() resets `a.error` to null, so a stale error from a replaced source is skipped here.
+    if (!a?.error || a.error.code === MediaError.MEDIA_ERR_ABORTED) return;
+    const id = this.#loadId;
+    this.error = `Playback failed for “${this.current?.title ?? 'track'}”`;
+    this.playing = false;
+    clearTimeout(this.#errorTimer);
+    this.#errorTimer = setTimeout(() => {
+      if (id === this.#loadId) this.next(true);
+    }, 1500);
   }
 
-  #nextIndex(): number | null {
-    if (this.repeat === 'one') return this.index;
+  #stuckAtEnd(): boolean {
+    const a = this.#audio;
+    // Tag duration, not a.duration: Safari derives the latter from the (wrong) estimated length.
+    const known = this.current?.duration;
+    if (!a || a.paused || !known) return false;
+    return a.currentTime >= known - 1.5;
+  }
+
+  // Repeat-one only applies to auto-advance; pressing Next should always move on.
+  #nextIndex(auto: boolean): number | null {
+    if (auto && this.repeat === 'one') return this.index;
     if (this.shuffle) {
       const remaining = this.queue
         .map((_, i) => i)
@@ -127,14 +159,12 @@ class Player {
     a.paused ? a.play().catch(() => {}) : a.pause();
   }
   next(auto = false) {
-    const n = this.#nextIndex();
+    const n = this.#nextIndex(auto);
     if (n === null) {
-      if (auto) {
-        this.playing = false;
-      }
+      if (auto) this.playing = false;
       return;
     }
-    this.#history.push(this.index);
+    if (n !== this.index) this.#history.push(this.index);
     this.#load(n, true);
   }
   prev() {
