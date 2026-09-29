@@ -9,6 +9,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
       NAVIDROME_URL: ${NAVIDROME_URL:-}
+      ALLOW_ANY_SERVER: 'true' # local only; lets the login form accept any server URL
       ORIGIN: http://localhost:47213
       COOKIE_SECURE: 'false'
     volumes: [music-data:/data]

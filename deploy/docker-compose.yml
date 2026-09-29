@@ -5,7 +5,8 @@ services:
     container_name: music
     image: ghcr.io/ze-castro/music:latest
     restart: unless-stopped
-    ports: ['47213:3000']
+    # Loopback only: reachable by cloudflared on this host, not from the internet directly.
+    ports: ['127.0.0.1:47213:3000']
     networks: [default, navidrome] # remove `navidrome` + the networks block below if Navidrome isn't in Docker
     environment:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}

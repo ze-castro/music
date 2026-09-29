@@ -1,9 +1,10 @@
-name: Build & push image
+name: Check, build & push image
 
 on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,7 +12,18 @@ permissions:
   packages: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+
   build:
+    needs: check
+    # PRs only get the check; images are published from main and tags.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -2,8 +2,14 @@ import type { Handle, ServerInit } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { readSession } from '$lib/server/session';
 import { initDb } from '$lib/server/db';
+import { dev } from '$app/environment';
+import { env } from '$env/dynamic/private';
 
 export const init: ServerInit = async () => {
+  // Without a pinned server, the login form makes this server fetch any URL a visitor types (SSRF).
+  if (!dev && !env.NAVIDROME_URL && env.ALLOW_ANY_SERVER !== 'true') {
+    throw new Error('NAVIDROME_URL must be set in production (or ALLOW_ANY_SERVER=true to opt out).');
+  }
   await initDb();
 };
 
