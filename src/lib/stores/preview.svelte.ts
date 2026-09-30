@@ -13,7 +13,7 @@ class Preview {
       this.stop();
       return;
     }
-    if (player.playing) player.toggle();
+    player.pause();
     this.#a ??= this.#make();
     this.error = null;
     this.#a.src = `/api/recs/preview/${id}?kind=${kind}`;

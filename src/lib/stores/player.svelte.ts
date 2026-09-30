@@ -3,6 +3,11 @@ import { settings } from './settings.svelte';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
+// WebKit's Audio Session API (Safari 16.4+). Not in TS's lib.dom yet.
+type NavigatorWithAudioSession = Navigator & {
+  audioSession?: { type: 'auto' | 'playback' | 'transient' | 'transient-solo' | 'ambient' | 'play-and-record' };
+};
+
 class Player {
   queue = $state<Track[]>([]);
   index = $state(-1);
@@ -27,6 +32,12 @@ class Player {
 
   #el(): HTMLAudioElement {
     if (this.#audio) return this.#audio;
+    // iOS: with the default 'auto' session, WebKit can deactivate audio output in the gap between
+    // `ended` and the next source starting while the screen is locked. The next track then
+    // "plays" (time advances, lock screen updates) but is silent. 'playback' pins it as music.
+    const session = (navigator as NavigatorWithAudioSession).audioSession;
+    if (session) session.type = 'playback';
+
     const a = new Audio();
     a.preload = 'auto';
     a.volume = this.volume;
@@ -41,10 +52,12 @@ class Player {
     });
     a.addEventListener('play', () => {
       this.playing = true;
-      this.#mediaSession();
+      this.#mediaMetadata();
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
     a.addEventListener('pause', () => {
       this.playing = false;
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     });
     // `a.ended` is false if this event belongs to a source we already replaced.
     a.addEventListener('ended', () => {
@@ -58,6 +71,7 @@ class Player {
     a.addEventListener('stalled', advanceIfStuckAtEnd);
     a.addEventListener('waiting', advanceIfStuckAtEnd);
     a.addEventListener('error', () => this.#onError());
+    this.#bindMediaSession();
     this.#audio = a;
     return a;
   }
@@ -154,9 +168,14 @@ class Player {
   }
 
   toggle() {
-    const a = this.#el();
+    this.#el().paused ? this.play() : this.pause();
+  }
+  play() {
     if (!this.current) return;
-    a.paused ? a.play().catch(() => {}) : a.pause();
+    this.#el().play().catch(() => {});
+  }
+  pause() {
+    this.#audio?.pause();
   }
   next(auto = false) {
     const n = this.#nextIndex(auto);
@@ -234,7 +253,7 @@ class Player {
     }
   }
 
-  #mediaSession() {
+  #mediaMetadata() {
     if (!('mediaSession' in navigator) || !this.current) return;
     const c = this.current;
     const art = this.coverUrl(c, 512);
@@ -244,11 +263,18 @@ class Player {
       album: c.album ?? '',
       artwork: art ? [{ src: art, sizes: '512x512', type: 'image/jpeg' }] : [],
     });
-    navigator.mediaSession.setActionHandler('play', () => this.toggle());
-    navigator.mediaSession.setActionHandler('pause', () => this.toggle());
-    navigator.mediaSession.setActionHandler('previoustrack', () => this.prev());
-    navigator.mediaSession.setActionHandler('nexttrack', () => this.next());
-    navigator.mediaSession.setActionHandler('seekto', (d) => {
+  }
+
+  // Explicit play/pause, not toggle: if the element and iOS disagree about state, a lock-screen
+  // "play" must never pause.
+  #bindMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    ms.setActionHandler('play', () => this.play());
+    ms.setActionHandler('pause', () => this.pause());
+    ms.setActionHandler('previoustrack', () => this.prev());
+    ms.setActionHandler('nexttrack', () => this.next());
+    ms.setActionHandler('seekto', (d) => {
       if (d.seekTime != null) this.seek(d.seekTime);
     });
   }
