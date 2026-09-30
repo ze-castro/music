@@ -8,6 +8,9 @@ type NavigatorWithAudioSession = Navigator & {
   audioSession?: { type: 'auto' | 'playback' | 'transient' | 'transient-solo' | 'ambient' | 'play-and-record' };
 };
 
+// Next track downloaded in full ahead of time. See #prefetchNext.
+type Prefetch = { key: string; ctrl: AbortController; blobUrl: string | null };
+
 class Player {
   queue = $state<Track[]>([]);
   index = $state(-1);
@@ -29,6 +32,10 @@ class Player {
   // Bumped on every track change; async callbacks from an older load compare against it.
   #loadId = 0;
   #errorTimer: ReturnType<typeof setTimeout> | undefined;
+  #pre: Prefetch | null = null;
+  #currentBlobUrl: string | null = null;
+  // Shuffle's choice for the next track, fixed in advance so the prefetch targets the right one.
+  #shufflePick: number | null = null;
 
   #el(): HTMLAudioElement {
     if (this.#audio) return this.#audio;
@@ -45,6 +52,8 @@ class Player {
     a.addEventListener('timeupdate', () => {
       this.currentTime = a.currentTime;
       this.#maybeScrobble();
+      // Wait a few seconds so the prefetch doesn't compete with the current track's startup.
+      if (a.currentTime > 5) this.#prefetchNext();
     });
     a.addEventListener('durationchange', () => {
       // Transcoded streams can report Infinity/NaN; fall back to the tag duration.
@@ -53,6 +62,10 @@ class Player {
     a.addEventListener('play', () => {
       this.playing = true;
       this.#mediaMetadata();
+    });
+    // 'playing' (audio actually rendering), not 'play': otherwise the lock screen's clock runs
+    // while the element is still waiting for data.
+    a.addEventListener('playing', () => {
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
     a.addEventListener('pause', () => {
@@ -109,11 +122,26 @@ class Player {
     this.currentTime = 0;
     this.duration = t.duration ?? 0;
 
+    this.#shufflePick = null;
+
     const a = this.#el();
-    const url = new URL(this.streamUrl(t), location.href).href;
+    const key = this.streamUrl(t);
+    const pre = this.#pre;
+    this.#pre = null;
+    let url: string;
+    let blobUrl: string | null = null;
+    if (pre?.key === key && pre.blobUrl) {
+      url = blobUrl = pre.blobUrl;
+    } else {
+      this.#discard(pre);
+      url = new URL(key, location.href).href;
+    }
     // Assigning a new src already starts loading; an extra load() makes Safari abort and re-request.
     if (a.src !== url) a.src = url;
     else a.load(); // same track again (repeat-one, prev at queue start, retry after error)
+    // Safe to free only after the element has switched away from it.
+    if (this.#currentBlobUrl && this.#currentBlobUrl !== url) URL.revokeObjectURL(this.#currentBlobUrl);
+    this.#currentBlobUrl = blobUrl;
 
     if (autoplay) {
       a.play().catch((e: unknown) => {
@@ -147,21 +175,22 @@ class Player {
     return a.currentTime >= known - 1.5;
   }
 
+  #remaining(): number[] {
+    return this.queue.map((_, i) => i).filter((i) => i !== this.index && !this.#history.includes(i));
+  }
+
   // Repeat-one only applies to auto-advance; pressing Next should always move on.
+  // No side effects besides fixing the shuffle pick, so the prefetch can call it to peek.
   #nextIndex(auto: boolean): number | null {
     if (auto && this.repeat === 'one') return this.index;
     if (this.shuffle) {
-      const remaining = this.queue
-        .map((_, i) => i)
-        .filter((i) => i !== this.index && !this.#history.includes(i));
-      if (remaining.length === 0) {
-        if (this.repeat === 'all') {
-          this.#history = [];
-          return Math.floor(Math.random() * this.queue.length);
-        }
-        return null;
+      const remaining = this.#remaining();
+      const pool = remaining.length ? remaining : this.repeat === 'all' ? this.queue.map((_, i) => i) : [];
+      if (pool.length === 0) return null;
+      if (this.#shufflePick === null || !pool.includes(this.#shufflePick)) {
+        this.#shufflePick = pool[Math.floor(Math.random() * pool.length)];
       }
-      return remaining[Math.floor(Math.random() * remaining.length)];
+      return this.#shufflePick;
     }
     if (this.index + 1 < this.queue.length) return this.index + 1;
     return this.repeat === 'all' ? 0 : null;
@@ -183,6 +212,8 @@ class Player {
       if (auto) this.playing = false;
       return;
     }
+    // Shuffle wrapped around (repeat-all): start a fresh cycle.
+    if (this.shuffle && this.#remaining().length === 0) this.#history = [];
     if (n !== this.index) this.#history.push(this.index);
     this.#load(n, true);
   }
@@ -223,14 +254,47 @@ class Player {
 
   setBitrate(kbps: number) {
     settings.set('maxBitRate', kbps);
+    this.#discard(this.#pre);
+    this.#pre = null;
     const a = this.#audio;
     if (!a || !this.current) return;
     const t = a.currentTime,
       wasPlaying = !a.paused;
     a.src = this.streamUrl(this.current);
     a.load();
+    if (this.#currentBlobUrl) URL.revokeObjectURL(this.#currentBlobUrl);
+    this.#currentBlobUrl = null;
     a.currentTime = t;
     if (wasPlaying) a.play().catch(() => {});
+  }
+
+  // iOS: while locked, starting a *network* stream for the next track can take long enough
+  // (Navidrome spinning up a transcode, tunnel round trips) that iOS cuts the page's audio.
+  // Downloading the next track in full during the current one makes the switch instant.
+  // Cheap to call repeatedly: returns early while the planned track hasn't changed.
+  #prefetchNext() {
+    const n = this.#nextIndex(true);
+    const key = n === null ? null : this.streamUrl(this.queue[n]);
+    if (this.#pre?.key === key) return;
+    this.#discard(this.#pre);
+    this.#pre = null;
+    if (!key) return;
+    const pre: Prefetch = { key, ctrl: new AbortController(), blobUrl: null };
+    this.#pre = pre;
+    // Same stream as `key`, minus the estimated Content-Length (see /api/stream).
+    fetch(`${key}${key.includes('?') ? '&' : '?'}estimate=0`, { signal: pre.ctrl.signal })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((b) => {
+        if (this.#pre === pre) pre.blobUrl = URL.createObjectURL(b);
+      })
+      // On failure keep `pre` (blobUrl null) so we don't retry every timeupdate; #load streams instead.
+      .catch(() => {});
+  }
+
+  #discard(pre: Prefetch | null) {
+    if (!pre) return;
+    pre.ctrl.abort();
+    if (pre.blobUrl) URL.revokeObjectURL(pre.blobUrl);
   }
 
   #maybeScrobble() {

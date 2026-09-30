@@ -7,6 +7,9 @@ export const GET: RequestHandler = async ({ params, url, request, locals }) => {
   const client = await clientForUser(locals.user!);
   const maxBitRate = url.searchParams.get('maxBitRate');
   const format = url.searchParams.get('format') ?? undefined;
+  // estimate=0: whole-file download (player prefetch). A guessed Content-Length that overshoots
+  // the real body makes fetch() fail, so let Navidrome send it chunked instead.
+  const estimateContentLength = url.searchParams.get('estimate') !== '0';
   const headers: Record<string, string> = {};
   const range = request.headers.get('range');
   if (range) headers.range = range;
@@ -17,7 +20,7 @@ export const GET: RequestHandler = async ({ params, url, request, locals }) => {
     // connection and Navidrome stops transcoding instead of competing with the next track.
     upstream = await client.stream(
       params.id,
-      { maxBitRate: maxBitRate ? Number(maxBitRate) : undefined, format },
+      { maxBitRate: maxBitRate ? Number(maxBitRate) : undefined, format, estimateContentLength },
       { headers, signal: request.signal },
     );
   } catch (e) {

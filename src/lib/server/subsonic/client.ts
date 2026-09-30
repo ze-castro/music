@@ -277,12 +277,17 @@ export class SubsonicClient {
   /** maxBitRate=0 or undefined → original / server default. format='raw' bypasses transcoding. */
   stream(
     id: string,
-    opts: { maxBitRate?: number; format?: string } = {},
+    opts: { maxBitRate?: number; format?: string; estimateContentLength?: boolean } = {},
     init: { headers?: HeadersInit; signal?: AbortSignal } = {},
   ) {
     return this.fetchBinary(
       'stream',
-      { id, maxBitRate: opts.maxBitRate, format: opts.format, estimateContentLength: 'true' },
+      {
+        id,
+        maxBitRate: opts.maxBitRate,
+        format: opts.format,
+        estimateContentLength: opts.estimateContentLength === false ? undefined : 'true',
+      },
       init,
     );
   }
