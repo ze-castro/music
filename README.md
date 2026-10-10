@@ -58,6 +58,14 @@ Total cost, ~**€68** in API tokens:
 
 iOS 26 has a WebKit regression ([bug 295518](https://bugs.webkit.org/show_bug.cgi?id=295518)): audio in a home-screen PWA may not resume after the app is backgrounded and reopened. The same page in a normal Safari tab works. Apple's bug, not fixable app-side yet.
 
+### iOS lock screen: two WebKit traps and how the player avoids them
+
+For anyone building a web music player and hitting the same thing. Both fixes are in `src/lib/stores/player.svelte.ts` and were confirmed on a real iPhone (October 2026).
+
+**The next song is silent when the phone is locked.** A song ends, the lock screen shows the next one "playing" and the clock runs, but there is no sound until you open the app. When an audio element plays to its very end and nothing else is playing, WebKit deactivates the page's audio session, and a page that is not on screen cannot get it back (WebKit bugs [261858](https://bugs.webkit.org/show_bug.cgi?id=261858) and [267606](https://bugs.webkit.org/show_bug.cgi?id=267606), both still open). There is no iPhone setting for it, and `navigator.audioSession.type = 'playback'` does not prevent it. It only happens for an element that has _ended_, not one whose source was swapped mid-play. So while the page is hidden, the player never lets a track end: it switches to the next one within the last half second (`#handOverEarly`). The cost is losing up to 0.5 s of each song's tail while locked.
+
+**The lock screen shows ±10 s buttons instead of previous/next.** That is WebKit's default set, shown whenever it holds no handlers from the page. WebKit can drop Media Session handlers that were registered before playback started and does not restore them. Registering the handlers again on every `play` and `playing` event (`#bindMediaSession`), instead of once at setup, brings previous/next back.
+
 ---
 
 ## Stack
