@@ -15,6 +15,9 @@ type Prefetch = { key: string; ctrl: AbortController; blobUrl: string | null };
 export const ART = { mini: 120, full: 800 } as const;
 // This many failures in a row means the problem isn't the track; stop auto-skipping.
 const MAX_FAILS = 3;
+// How close to the end a hidden iOS page switches tracks. timeupdate fires about every 0.25 s,
+// so this guarantees one tick lands inside the window. See #handOverEarly.
+const HANDOVER_S = 0.5;
 
 class Player {
   queue = $state<Track[]>([]);
@@ -47,6 +50,8 @@ class Player {
   // The loaded source has begun rendering audio.
   #started = false;
   #failStreak = 0;
+  // iPhone/iPad WebKit (touch + Audio Session API). See #handOverEarly.
+  #ios = false;
   // Shuffle's choice for the next track, fixed in advance so the prefetch targets the right one.
   #shufflePick: number | null = null;
   // Next track's covers. Held so the decoded images stay in the browser's memory cache.
@@ -59,6 +64,7 @@ class Player {
     // "plays" (time advances, lock screen updates) but is silent. 'playback' pins it as music.
     const session = (navigator as NavigatorWithAudioSession).audioSession;
     if (session) session.type = 'playback';
+    this.#ios = !!session && navigator.maxTouchPoints > 0;
 
     const a = new Audio();
     a.preload = 'auto';
@@ -69,6 +75,7 @@ class Player {
       this.#maybeScrobble();
       // Re-checked every tick: shuffle, repeat and queue edits change which track is next.
       this.#prefetchWhenSafe(a);
+      this.#handOverEarly(a);
     });
     a.addEventListener('durationchange', () => {
       // Transcoded streams can report Infinity/NaN; fall back to the tag duration.
@@ -77,12 +84,14 @@ class Player {
     a.addEventListener('play', () => {
       this.playing = true;
       this.#mediaMetadata();
+      this.#bindMediaSession();
     });
     // 'playing' (audio actually rendering), not 'play': otherwise the lock screen's clock runs
     // while the element is still waiting for data.
     a.addEventListener('playing', () => {
       this.#wait(false);
       this.#failStreak = 0;
+      this.#bindMediaSession();
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       this.#started = true;
       this.#prefetchWhenSafe(a);
@@ -107,7 +116,6 @@ class Player {
       advanceIfStuckAtEnd();
     });
     a.addEventListener('error', () => this.#onError());
-    this.#bindMediaSession();
     this.#audio = a;
     return a;
   }
@@ -379,6 +387,18 @@ class Player {
     if (this.#currentBlobUrl || a.currentTime > 5 || this.#bufferedAhead(a) >= 10) this.#prefetchNext();
   }
 
+  // iOS: when a track plays to its very end and nothing else is playing, WebKit deactivates the
+  // page's audio session, and a page that isn't on screen can't get it back. The next track then
+  // "plays" (time advances, lock screen updates) in silence. WebKit bugs 261858 and 267606; the
+  // Audio Session type doesn't prevent it. Deactivation only happens for an *ended* element, so
+  // while hidden, never let one end: switch to the next track a fraction of a second early.
+  #handOverEarly(a: HTMLAudioElement) {
+    if (!this.#ios || !this.#started || a.paused || document.visibilityState !== 'hidden') return;
+    if (!Number.isFinite(a.duration) || a.duration - a.currentTime > HANDOVER_S) return;
+    if (this.#nextIndex(true) === null) return; // end of the queue: let it finish
+    this.next(true);
+  }
+
   #bufferedAhead(a: HTMLAudioElement): number {
     const t = a.currentTime;
     for (let i = 0; i < a.buffered.length; i++) {
@@ -425,6 +445,9 @@ class Player {
     });
   }
 
+  // Called on every play/playing, not once at setup. WebKit keeps the page's handlers in an object
+  // it creates and drops with its Now Playing state and never restores them; with none it shows its
+  // default lock-screen controls (±10 s instead of previous/next). Registering again is harmless.
   // Explicit play/pause, not toggle: if the element and iOS disagree about state, a lock-screen
   // "play" must never pause.
   #bindMediaSession() {
