@@ -21,7 +21,9 @@
     {/if}
     <div class="min-w-0">
       <h1 class="text-2xl font-semibold tracking-tight">{data.name}</h1>
-      <div class="text-xs text-muted-foreground">{data.tracks.length} songs</div>
+      <div class="text-xs text-muted-foreground">
+        {data.tracks.length} songs{data.unavailable ? ` · ${data.unavailable} unavailable` : ''}
+      </div>
       {#if data.tracks.length}
         <div class="mt-3 flex gap-2">
           <button
