@@ -29,8 +29,10 @@
   const mobileActive = (href: string) => (href === '/library' ? LIBRARY_PATHS.some((p) => p === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(p)) : active(href));
 
   function onKey(e: KeyboardEvent) {
+    // Leave browser shortcuts alone: Cmd+←/→ is back/forward.
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target as HTMLElement;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if (e.code === 'Space') { e.preventDefault(); player.toggle(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); e.shiftKey ? player.next() : player.seekBy(10); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); e.shiftKey ? player.prev() : player.seekBy(-10); }

@@ -8,8 +8,9 @@
     Shuffle,
     Repeat,
     Repeat1,
+    LoaderCircle,
   } from '@lucide/svelte';
-  import { player } from '$lib/stores/player.svelte';
+  import { player, ART } from '$lib/stores/player.svelte';
   import { fmtTime } from '$lib/utils';
   import Artwork from './Artwork.svelte';
   import LikeButton from './LikeButton.svelte';
@@ -34,6 +35,10 @@
     if (dy > CLOSE_AT) player.expanded = false;
     dy = 0;
   }
+
+  // Seek-bar position while dragging. Seeking only on release: every seek restarts the stream.
+  let scrub = $state<number | null>(null);
+  const shownTime = $derived(scrub ?? player.currentTime);
 </script>
 
 {#if player.expanded && player.current}
@@ -68,7 +73,8 @@
         <Artwork
           coverArt={player.current.coverArt}
           name={player.current.album ?? player.current.title}
-          size={800}
+          size={ART.full}
+          lazy={false}
           class="rounded-xl shadow-2xl"
         />
       </div>
@@ -94,14 +100,18 @@
           min="0"
           max={player.duration || 0}
           step="0.5"
-          value={player.currentTime}
-          oninput={(e) => player.seek(Number(e.currentTarget.value))}
+          value={shownTime}
+          oninput={(e) => (scrub = Number(e.currentTarget.value))}
+          onchange={(e) => {
+            player.seek(Number(e.currentTarget.value));
+            scrub = null;
+          }}
+          onblur={() => (scrub = null)}
           class="w-full accent-foreground"
           aria-label="Seek"
         />
         <div class="flex justify-between text-xs tabular-nums text-muted-foreground">
-          <span>{fmtTime(player.currentTime)}</span><span
-            >-{fmtTime(player.duration - player.currentTime)}</span
+          <span>{fmtTime(shownTime)}</span><span>-{fmtTime(player.duration - shownTime)}</span
           >
         </div>
       </div>
@@ -125,7 +135,9 @@
           onclick={() => player.toggle()}
           aria-label={player.playing ? 'Pause' : 'Play'}
         >
-          {#if player.playing}<Pause size={32} />{:else}<Play size={32} class="ml-1" />{/if}
+          {#if player.buffering}<LoaderCircle size={32} class="animate-spin" />{:else if player.playing}<Pause
+              size={32}
+            />{:else}<Play size={32} class="ml-1" />{/if}
         </button>
         <button
           class="grid h-12 w-12 place-items-center rounded-full hover:bg-accent"
@@ -142,6 +154,11 @@
           {#if player.repeat === 'one'}<Repeat1 size={20} />{:else}<Repeat size={20} />{/if}
         </button>
       </div>
+      {#if player.error}
+        <div class="w-full max-w-sm shrink-0 text-center text-xs text-destructive" role="alert">
+          {player.error}
+        </div>
+      {/if}
     </div>
   </div>
 {/if}

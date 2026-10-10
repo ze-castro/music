@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX } from '@lucide/svelte';
-  import { player } from '$lib/stores/player.svelte';
+  import { Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX, LoaderCircle } from '@lucide/svelte';
+  import { player, ART } from '$lib/stores/player.svelte';
   import Artwork from './Artwork.svelte';
   // floating = mobile pill (matches tab bar); docked = desktop full-width bar
   let { floating = false }: { floating?: boolean } = $props();
@@ -40,7 +40,8 @@
         <Artwork
           coverArt={player.current.coverArt}
           name={player.current.album ?? player.current.title}
-          size={120}
+          size={ART.mini}
+          lazy={false}
           class="h-11 w-11 shrink-0 rounded-full"
         />
         <div class="min-w-0">
@@ -79,7 +80,7 @@
           />
         </svg>
         <span class="grid h-8 w-8 place-items-center rounded-full bg-foreground text-background">
-          {#if player.playing}<Pause size={15} />{:else}<Play size={15} class="ml-0.5" />{/if}
+          {#if player.buffering}<LoaderCircle size={15} class="animate-spin" />{:else if player.playing}<Pause size={15} />{:else}<Play size={15} class="ml-0.5" />{/if}
         </span>
       </button>
       <button
@@ -114,7 +115,8 @@
           <Artwork
             coverArt={player.current.coverArt}
             name={player.current.album ?? player.current.title}
-            size={120}
+            size={ART.mini}
+            lazy={false}
             class="h-11 w-11 shrink-0"
           />
           <div class="min-w-0">
@@ -133,7 +135,7 @@
             onclick={() => player.toggle()}
             aria-label={player.playing ? 'Pause' : 'Play'}
           >
-            {#if player.playing}<Pause size={20} />{:else}<Play size={20} />{/if}
+            {#if player.buffering}<LoaderCircle size={20} class="animate-spin" />{:else if player.playing}<Pause size={20} />{:else}<Play size={20} />{/if}
           </button>
           <button
             class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent"

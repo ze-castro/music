@@ -11,10 +11,17 @@ type NavigatorWithAudioSession = Navigator & {
 // Next track downloaded in full ahead of time. See #prefetchNext.
 type Prefetch = { key: string; ctrl: AbortController; blobUrl: string | null };
 
+// Cover sizes the player UI asks for. Shared so the prefetch warms exactly these.
+export const ART = { mini: 120, full: 800 } as const;
+// This many failures in a row means the problem isn't the track; stop auto-skipping.
+const MAX_FAILS = 3;
+
 class Player {
   queue = $state<Track[]>([]);
   index = $state(-1);
   playing = $state(false);
+  // Waiting for audio data: track starting, seeking, or the connection fell behind.
+  buffering = $state(false);
   currentTime = $state(0);
   duration = $state(0);
   shuffle = $state(false);
@@ -32,10 +39,18 @@ class Player {
   // Bumped on every track change; async callbacks from an older load compare against it.
   #loadId = 0;
   #errorTimer: ReturnType<typeof setTimeout> | undefined;
+  #bufferTimer: ReturnType<typeof setTimeout> | undefined;
   #pre: Prefetch | null = null;
+  // Stream key of the loaded source, and its blob URL when it plays from a prefetch.
+  #currentKey: string | null = null;
   #currentBlobUrl: string | null = null;
+  // The loaded source has begun rendering audio.
+  #started = false;
+  #failStreak = 0;
   // Shuffle's choice for the next track, fixed in advance so the prefetch targets the right one.
   #shufflePick: number | null = null;
+  // Next track's covers. Held so the decoded images stay in the browser's memory cache.
+  #warm: HTMLImageElement[] = [];
 
   #el(): HTMLAudioElement {
     if (this.#audio) return this.#audio;
@@ -52,8 +67,8 @@ class Player {
     a.addEventListener('timeupdate', () => {
       this.currentTime = a.currentTime;
       this.#maybeScrobble();
-      // Wait a few seconds so the prefetch doesn't compete with the current track's startup.
-      if (a.currentTime > 5) this.#prefetchNext();
+      // Re-checked every tick: shuffle, repeat and queue edits change which track is next.
+      this.#prefetchWhenSafe(a);
     });
     a.addEventListener('durationchange', () => {
       // Transcoded streams can report Infinity/NaN; fall back to the tag duration.
@@ -66,10 +81,15 @@ class Player {
     // 'playing' (audio actually rendering), not 'play': otherwise the lock screen's clock runs
     // while the element is still waiting for data.
     a.addEventListener('playing', () => {
+      this.#wait(false);
+      this.#failStreak = 0;
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      this.#started = true;
+      this.#prefetchWhenSafe(a);
     });
     a.addEventListener('pause', () => {
       this.playing = false;
+      this.#wait(false);
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     });
     // `a.ended` is false if this event belongs to a source we already replaced.
@@ -82,7 +102,10 @@ class Player {
       if (this.#stuckAtEnd()) this.next(true);
     };
     a.addEventListener('stalled', advanceIfStuckAtEnd);
-    a.addEventListener('waiting', advanceIfStuckAtEnd);
+    a.addEventListener('waiting', () => {
+      if (!a.paused) this.#wait(true);
+      advanceIfStuckAtEnd();
+    });
     a.addEventListener('error', () => this.#onError());
     this.#bindMediaSession();
     this.#audio = a;
@@ -102,6 +125,7 @@ class Player {
   playQueue(tracks: Track[], startIndex = 0) {
     this.queue = tracks;
     this.#history = [];
+    this.#failStreak = 0;
     this.#load(startIndex, true);
   }
   playNext(t: Track) {
@@ -123,35 +147,49 @@ class Player {
     this.duration = t.duration ?? 0;
 
     this.#shufflePick = null;
+    this.#started = false;
+    this.#wait(autoplay);
 
     const a = this.#el();
     const key = this.streamUrl(t);
     const pre = this.#pre;
     this.#pre = null;
-    let url: string;
     let blobUrl: string | null = null;
     if (pre?.key === key && pre.blobUrl) {
-      url = blobUrl = pre.blobUrl;
+      blobUrl = pre.blobUrl;
     } else {
       this.#discard(pre);
-      url = new URL(key, location.href).href;
+      // Same track again: the copy already in memory is still good.
+      if (key === this.#currentKey) blobUrl = this.#currentBlobUrl;
     }
+    const url = blobUrl ?? new URL(key, location.href).href;
     // Assigning a new src already starts loading; an extra load() makes Safari abort and re-request.
     if (a.src !== url) a.src = url;
     else a.load(); // same track again (repeat-one, prev at queue start, retry after error)
     // Safe to free only after the element has switched away from it.
     if (this.#currentBlobUrl && this.#currentBlobUrl !== url) URL.revokeObjectURL(this.#currentBlobUrl);
     this.#currentBlobUrl = blobUrl;
+    this.#currentKey = key;
 
     if (autoplay) {
       a.play().catch((e: unknown) => {
         // AbortError = interrupted by a newer load (fast skipping). Expected, not a failure.
         if (id !== this.#loadId) return;
         if (e instanceof DOMException && e.name === 'AbortError') return;
+        // The source itself failed: the `error` event reports that (and decides whether to skip).
+        if (a.error) return;
         this.error = `Couldn't start playback: ${e instanceof Error ? e.message : String(e)}`;
         this.playing = false;
+        this.#wait(false);
       });
     }
+  }
+
+  // Raised only after a short delay, so a quick start doesn't flash a spinner.
+  #wait(on: boolean) {
+    clearTimeout(this.#bufferTimer);
+    if (on) this.#bufferTimer = setTimeout(() => (this.buffering = true), 400);
+    else this.buffering = false;
   }
 
   #onError() {
@@ -159,12 +197,38 @@ class Player {
     // load() resets `a.error` to null, so a stale error from a replaced source is skipped here.
     if (!a?.error || a.error.code === MediaError.MEDIA_ERR_ABORTED) return;
     const id = this.#loadId;
-    this.error = `Playback failed for “${this.current?.title ?? 'track'}”`;
     this.playing = false;
+    this.#wait(false);
+    // Don't reuse a source that just failed (see #load).
+    this.#currentKey = null;
     clearTimeout(this.#errorTimer);
+    void this.#signedOut().then((out) => {
+      if (out) location.reload();
+    });
+    if (++this.#failStreak >= MAX_FAILS) {
+      this.error = 'Playback keeps failing. Check your connection and try again.';
+      return;
+    }
+    this.error = `Playback failed for “${this.current?.title ?? 'track'}”`;
     this.#errorTimer = setTimeout(() => {
       if (id === this.#loadId) this.next(true);
     }, 1500);
+  }
+
+  // A failed stream can also mean the sign-in expired: ours, or an auth proxy's in front of the app
+  // (Cloudflare Access answers 401 to XHR-marked requests, a redirect otherwise). Skipping tracks
+  // can't fix that; a full page load can, because only a navigation gets to re-authenticate.
+  async #signedOut(): Promise<boolean> {
+    try {
+      const r = await fetch('/api/ping', {
+        headers: { 'x-requested-with': 'XMLHttpRequest' },
+        redirect: 'manual',
+        cache: 'no-store',
+      });
+      return r.status === 401 || r.type === 'opaqueredirect';
+    } catch {
+      return false; // offline or server down: not an auth problem
+    }
   }
 
   #stuckAtEnd(): boolean {
@@ -209,7 +273,10 @@ class Player {
   next(auto = false) {
     const n = this.#nextIndex(auto);
     if (n === null) {
-      if (auto) this.playing = false;
+      if (auto) {
+        this.playing = false;
+        this.#wait(false);
+      }
       return;
     }
     // Shuffle wrapped around (repeat-all): start a fresh cycle.
@@ -228,6 +295,7 @@ class Player {
   }
   seek(sec: number) {
     this.#el().currentTime = sec;
+    this.currentTime = sec; // don't wait for the next timeupdate; the seek bar would jump back
   }
   seekBy(delta: number) {
     const a = this.#el();
@@ -260,7 +328,7 @@ class Player {
     if (!a || !this.current) return;
     const t = a.currentTime,
       wasPlaying = !a.paused;
-    a.src = this.streamUrl(this.current);
+    a.src = this.#currentKey = this.streamUrl(this.current);
     a.load();
     if (this.#currentBlobUrl) URL.revokeObjectURL(this.#currentBlobUrl);
     this.#currentBlobUrl = null;
@@ -274,13 +342,24 @@ class Player {
   // Cheap to call repeatedly: returns early while the planned track hasn't changed.
   #prefetchNext() {
     const n = this.#nextIndex(true);
-    const key = n === null ? null : this.streamUrl(this.queue[n]);
-    if (this.#pre?.key === key) return;
+    const next = n === null ? null : this.queue[n];
+    let key = next ? this.streamUrl(next) : null;
+    // Repeating a track that already plays from memory: #load reuses that copy.
+    if (key === this.#currentKey && this.#currentBlobUrl) key = null;
+    if ((this.#pre?.key ?? null) === key) return;
     this.#discard(this.#pre);
     this.#pre = null;
-    if (!key) return;
+    if (!key || !next) return;
     const pre: Prefetch = { key, ctrl: new AbortController(), blobUrl: null };
     this.#pre = pre;
+    // Its artwork too, so the cover changes with the audio instead of loading after it.
+    this.#warm = [ART.mini, ART.full].flatMap((size) => {
+      const src = this.coverUrl(next, size);
+      if (!src) return [];
+      const img = new Image();
+      img.src = src;
+      return [img];
+    });
     // Same stream as `key`, minus the estimated Content-Length (see /api/stream).
     fetch(`${key}${key.includes('?') ? '&' : '?'}estimate=0`, { signal: pre.ctrl.signal })
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
@@ -289,6 +368,23 @@ class Player {
       })
       // On failure keep `pre` (blobUrl null) so we don't retry every timeupdate; #load streams instead.
       .catch(() => {});
+  }
+
+  // Start the prefetch as early as possible, so even a quick skip is instant, but never at the
+  // current track's expense: until it is audible and has a few seconds buffered, the connection
+  // is all its own. On a fast link that takes a fraction of a second; a track that already plays
+  // from memory needs no wait at all. The 5 s mark is the fallback if `buffered` reports nothing.
+  #prefetchWhenSafe(a: HTMLAudioElement) {
+    if (!this.#started) return;
+    if (this.#currentBlobUrl || a.currentTime > 5 || this.#bufferedAhead(a) >= 10) this.#prefetchNext();
+  }
+
+  #bufferedAhead(a: HTMLAudioElement): number {
+    const t = a.currentTime;
+    for (let i = 0; i < a.buffered.length; i++) {
+      if (a.buffered.start(i) <= t && t <= a.buffered.end(i)) return a.buffered.end(i) - t;
+    }
+    return 0;
   }
 
   #discard(pre: Prefetch | null) {
@@ -320,12 +416,12 @@ class Player {
   #mediaMetadata() {
     if (!('mediaSession' in navigator) || !this.current) return;
     const c = this.current;
-    const art = this.coverUrl(c, 512);
+    const art = this.coverUrl(c, ART.full);
     navigator.mediaSession.metadata = new MediaMetadata({
       title: c.title,
       artist: c.artist ?? '',
       album: c.album ?? '',
-      artwork: art ? [{ src: art, sizes: '512x512', type: 'image/jpeg' }] : [],
+      artwork: art ? [{ src: art, sizes: `${ART.full}x${ART.full}`, type: 'image/jpeg' }] : [],
     });
   }
 
