@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/state';
-  import { beforeNavigate, afterNavigate } from '$app/navigation';
+  import { beforeNavigate, afterNavigate, onNavigate } from '$app/navigation';
   import { onMount, tick } from 'svelte';
   import { Disc3, Mic2, Music2, ListMusic, Sparkles, Search, Settings, Library } from '@lucide/svelte';
   import MiniPlayer from '$lib/components/MiniPlayer.svelte';
@@ -56,13 +56,45 @@
   const key = (u: URL) => u.pathname + u.search;
   beforeNavigate(({ from }) => { if (from && mainEl) scrollPos.set(key(from.url), mainEl.scrollTop); });
   afterNavigate(async ({ to, type }) => {
-    if (!mainEl || !to) return;
-    await tick();
-    mainEl.scrollTop = type === 'popstate' ? (scrollPos.get(key(to.url)) ?? 0) : 0;
+    if (mainEl && to) {
+      await tick();
+      mainEl.scrollTop = type === 'popstate' ? (scrollPos.get(key(to.url)) ?? 0) : 0;
+    }
+    scrolled?.();
+  });
+
+  // Page change crossfade (View Transitions; browsers without it just switch).
+  // Only what changed fades: the tab bar and mini player look the same in both
+  // pictures, so they stay still.
+  // Set when the browser already animated a back/forward swipe itself (Safari).
+  let browserAnimated = false;
+  // Resolved by afterNavigate once the new page's scroll position is set.
+  let scrolled: (() => void) | null = null;
+  onNavigate((nav) => {
+    if (!document.startViewTransition) return;
+    // Same page, new query (search, sort): not a page change.
+    if (nav.from?.url.pathname === nav.to?.url.pathname) return;
+    if (nav.type === 'popstate' && browserAnimated) return;
+    // A sheet or dialog is open or still closing: let it finish on its own.
+    if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+    return new Promise<void>((resolve) => {
+      const ready = new Promise<void>((r) => (scrolled = r));
+      document.startViewTransition(async () => {
+        resolve();
+        await nav.complete;
+        // Take the "after" picture once the scroll is restored, not before it jumps.
+        // Capped so a navigation that never finishes can't stall the page.
+        await Promise.race([ready, new Promise((r) => setTimeout(r, 300))]);
+        scrolled = null;
+      });
+    });
   });
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window
+  onkeydown={onKey}
+  onpopstate={(e) => (browserAnimated = !!(e as PopStateEvent & { hasUAVisualTransition?: boolean }).hasUAVisualTransition)}
+/>
 
 {#if data.user}
   <div class="flex h-[100lvh] w-full flex-col overflow-hidden md:flex-row">

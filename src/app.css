@@ -118,6 +118,14 @@ body {
   }
 }
 
+/* Page change crossfade (see onNavigate in +layout.svelte). Old and new share one
+   duration and curve so unchanged parts (tab bar, mini player) stay perfectly still. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: var(--ease-out);
+}
+
 /* Reduced motion: entrances keep their fade but don't move or grow. */
 @media (prefers-reduced-motion: reduce) {
   .animate-in,
