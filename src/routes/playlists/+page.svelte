@@ -110,7 +110,7 @@
           </button>
           {#if menuFor === p.id}
             <div
-              class="absolute right-1 top-10 z-20 w-40 overflow-hidden rounded-md border bg-popover text-sm shadow-lg"
+              class="absolute right-1 top-10 z-20 w-40 origin-top-right overflow-hidden rounded-md border bg-popover text-sm shadow-lg animate-in fade-in-0 zoom-in-95 duration-150 ease-out"
               role="menu"
             >
               <a
@@ -152,7 +152,7 @@
   <button
     onclick={openCreate}
     aria-label="New playlist"
-    class="fixed right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-foreground text-background shadow-lg md:hidden"
+    class="fixed right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-foreground text-background shadow-lg md:hidden transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
     style="bottom: calc(var(--bottom-stack, 6.5rem) + 0.75rem)"
   >
     <Plus size={24} />
@@ -161,7 +161,7 @@
 
 {#if creating}
   <div
-    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 animate-in fade-in-0 duration-200 ease-out"
     role="dialog"
     aria-modal="true"
     aria-label="New playlist"
@@ -177,7 +177,7 @@
           await update();
         };
       }}
-      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl"
+      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
     >
       <h2 class="mb-3 text-lg font-semibold">New playlist</h2>
       <!-- svelte-ignore a11y_autofocus -->
@@ -208,7 +208,7 @@
 
 {#if renaming}
   <div
-    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 animate-in fade-in-0 duration-200 ease-out"
     role="dialog"
     aria-modal="true"
     aria-label="Rename playlist"
@@ -230,7 +230,7 @@
           await update();
         };
       }}
-      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl"
+      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
     >
       <input type="hidden" name="id" value={renaming.id} />
       <h2 class="mb-3 text-lg font-semibold">Rename playlist</h2>
@@ -268,7 +268,7 @@
 
 {#if confirmDelete}
   <div
-    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+    class="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 animate-in fade-in-0 duration-200 ease-out"
     role="alertdialog"
     aria-modal="true"
     aria-label="Delete playlist"
@@ -284,7 +284,7 @@
           await update();
         };
       }}
-      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl"
+      class="w-full max-w-sm rounded-lg border bg-background p-5 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
     >
       <input type="hidden" name="id" value={confirmDelete.id} />
       <h2 class="text-lg font-semibold">Delete “{confirmDelete.name}”?</h2>

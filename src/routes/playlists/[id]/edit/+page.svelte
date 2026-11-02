@@ -5,6 +5,7 @@
   import Artwork from '$lib/components/Artwork.svelte';
   import { cmpName } from '$lib/sort';
   import { fmtTime } from '$lib/utils';
+  import { slideUp } from '$lib/motion';
   import type { PageData } from './$types';
   let { data }: { data: PageData } = $props();
 
@@ -163,6 +164,8 @@
     <form
       method="POST"
       action="?/add"
+      in:slideUp={{ duration: 250, fade: true }}
+      out:slideUp={{ duration: 200, fade: true }}
       use:enhance={() => {
         submitting = true;
         return async ({ update }) => {

@@ -2,7 +2,7 @@
   import '../app.css';
   import { page } from '$app/state';
   import { beforeNavigate, afterNavigate } from '$app/navigation';
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { Disc3, Mic2, Music2, ListMusic, Sparkles, Search, Settings, Library } from '@lucide/svelte';
   import MiniPlayer from '$lib/components/MiniPlayer.svelte';
   import NowPlaying from '$lib/components/NowPlaying.svelte';
@@ -38,6 +38,13 @@
     else if (e.key === 'ArrowLeft') { e.preventDefault(); e.shiftKey ? player.prev() : player.seekBy(-10); }
     else if (e.key === 'Escape') player.expanded = false;
   }
+
+  // iOS Safari only shows :active press states once the page listens for touches.
+  onMount(() => {
+    const noop = () => {};
+    document.addEventListener('touchstart', noop, { passive: true });
+    return () => document.removeEventListener('touchstart', noop);
+  });
 
   // Height of the floating mobile stack (mini player + tab bar + safe area).
   // Exposed as --bottom-stack so page-level floating buttons can sit above it.

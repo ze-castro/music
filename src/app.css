@@ -56,6 +56,12 @@
   --scrollbar-hover: oklch(1 0 0 / 0.4);
 }
 
+/* Motion curves. Same values as $lib/motion.ts, which the JS transitions use. */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @theme inline {
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -109,6 +115,19 @@ body {
   }
   .pt-safe {
     padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Reduced motion: entrances keep their fade but don't move or grow. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-out {
+    --tw-enter-scale: 1;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-scale: 1;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
   }
 }
 

@@ -15,25 +15,48 @@
   import Artwork from './Artwork.svelte';
   import LikeButton from './LikeButton.svelte';
 
+  import { slideUp } from '$lib/motion';
+
   // Swipe-down to dismiss. Pointer events cover touch + mouse.
   let dy = $state(0);
   let dragging = $state(false);
   let startY = 0;
   const CLOSE_AT = 120;
+  // A downward flick faster than this (px/ms) closes even before CLOSE_AT.
+  const FLICK = 0.11;
+  // Pointer positions from the last 100 ms, for the release speed.
+  let samples: { y: number; t: number }[] = [];
   function down(e: PointerEvent) {
     if ((e.target as HTMLElement).closest('input,select,button,a')) return;
     startY = e.clientY;
+    samples = [{ y: e.clientY, t: e.timeStamp }];
     dragging = true;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function move(e: PointerEvent) {
-    if (dragging) dy = Math.max(0, e.clientY - startY);
+    if (!dragging) return;
+    dy = Math.max(0, e.clientY - startY);
+    samples.push({ y: e.clientY, t: e.timeStamp });
+    while (samples.length > 2 && e.timeStamp - samples[0].t > 100) samples.shift();
   }
-  function up() {
+  function up(e: PointerEvent) {
     if (!dragging) return;
     dragging = false;
-    if (dy > CLOSE_AT) player.expanded = false;
-    dy = 0;
+    // Measure up to the release, so dragging then holding still doesn't count as a flick.
+    samples.push({ y: e.clientY, t: e.timeStamp });
+    while (samples.length > 2 && e.timeStamp - samples[0].t > 100) samples.shift();
+    const a = samples[0];
+    const b = samples[samples.length - 1];
+    const speed = b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;
+    // Closing keeps dy: the slide-out continues from where the finger let go.
+    if (dy > CLOSE_AT || (dy > 10 && speed > FLICK)) player.expanded = false;
+    else dy = 0;
+  }
+
+  // Escape closes at once: keyboard actions shouldn't wait on an animation.
+  let instant = $state(false);
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') instant = true;
   }
 
   // Seek-bar position while dragging. Seeking only on release: every seek restarts the stream.
@@ -41,14 +64,23 @@
   const shownTime = $derived(scrub ?? player.currentTime);
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 {#if player.expanded && player.current}
   <div
     class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background pt-safe pb-safe touch-none select-none"
     role="dialog"
     tabindex="-1"
     aria-label="Now playing"
+    in:slideUp={{ duration: 400 }}
+    out:slideUp={{ duration: 300, instant }}
+    onoutroend={() => {
+      dy = 0;
+      instant = false;
+    }}
+    onintrostart={() => (instant = false)}
     style:transform="translateY({dy}px)"
-    style:transition={dragging ? 'none' : 'transform 200ms ease-out'}
+    style:transition={dragging ? 'none' : 'transform 200ms var(--ease-out)'}
     onpointerdown={down}
     onpointermove={move}
     onpointerup={up}
@@ -66,10 +98,7 @@
     <div
       class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-8 pb-4 sm:gap-5"
     >
-      <div
-        class="w-[min(100%,24rem,42svh)] min-w-[10rem] shrink-0"
-        style:view-transition-name="now-playing-art"
-      >
+      <div class="w-[min(100%,24rem,42svh)] min-w-[10rem] shrink-0">
         <Artwork
           coverArt={player.current.coverArt}
           name={player.current.album ?? player.current.title}
@@ -118,7 +147,7 @@
 
       <div class="flex w-full max-w-sm shrink-0 items-center justify-between">
         <button
-          class="grid h-10 w-10 place-items-center rounded-full {player.shuffle
+          class="grid h-10 w-10 place-items-center rounded-full transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98] {player.shuffle
             ? 'text-foreground'
             : 'text-muted-foreground'}"
           onclick={() => (player.shuffle = !player.shuffle)}
@@ -126,12 +155,12 @@
           aria-pressed={player.shuffle}><Shuffle size={20} /></button
         >
         <button
-          class="grid h-12 w-12 place-items-center rounded-full hover:bg-accent"
+          class="grid h-12 w-12 place-items-center rounded-full hover:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
           onclick={() => player.prev()}
           aria-label="Previous"><SkipBack size={28} /></button
         >
         <button
-          class="grid h-16 w-16 place-items-center rounded-full bg-foreground text-background"
+          class="grid h-16 w-16 place-items-center rounded-full bg-foreground text-background transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
           onclick={() => player.toggle()}
           aria-label={player.playing ? 'Pause' : 'Play'}
         >
@@ -140,12 +169,12 @@
             />{:else}<Play size={32} class="ml-1" />{/if}
         </button>
         <button
-          class="grid h-12 w-12 place-items-center rounded-full hover:bg-accent"
+          class="grid h-12 w-12 place-items-center rounded-full hover:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
           onclick={() => player.next()}
           aria-label="Next"><SkipForward size={28} /></button
         >
         <button
-          class="grid h-10 w-10 place-items-center rounded-full {player.repeat !== 'off'
+          class="grid h-10 w-10 place-items-center rounded-full transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98] {player.repeat !== 'off'
             ? 'text-foreground'
             : 'text-muted-foreground'}"
           onclick={() => player.cycleRepeat()}

@@ -35,7 +35,6 @@
       <button
         class="flex min-w-0 flex-1 items-center gap-3 text-left"
         onclick={() => (player.expanded = true)}
-        style:view-transition-name="now-playing-art"
       >
         <Artwork
           coverArt={player.current.coverArt}
@@ -52,7 +51,7 @@
 
       <!-- play/pause with progress ring -->
       <button
-        class="relative grid h-11 w-11 shrink-0 place-items-center"
+        class="relative grid h-11 w-11 shrink-0 place-items-center transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
         onclick={() => player.toggle()}
         aria-label={player.playing ? 'Pause' : 'Play'}
       >
@@ -84,7 +83,7 @@
         </span>
       </button>
       <button
-        class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground active:bg-accent"
+        class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground active:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
         onclick={() => player.next()}
         aria-label="Next"><SkipForward size={20} /></button
       >
@@ -110,7 +109,6 @@
         <button
           class="flex min-w-0 flex-1 items-center gap-3 text-left"
           onclick={() => (player.expanded = true)}
-          style:view-transition-name="now-playing-art"
         >
           <Artwork
             coverArt={player.current.coverArt}
@@ -126,19 +124,19 @@
         </button>
         <div class="flex items-center gap-1">
           <button
-            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent"
+            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
             onclick={() => player.prev()}
             aria-label="Previous"><SkipBack size={18} /></button
           >
           <button
-            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent"
+            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
             onclick={() => player.toggle()}
             aria-label={player.playing ? 'Pause' : 'Play'}
           >
             {#if player.buffering}<LoaderCircle size={20} class="animate-spin" />{:else if player.playing}<Pause size={20} />{:else}<Play size={20} />{/if}
           </button>
           <button
-            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent"
+            class="grid h-9 w-9 place-items-center rounded-full hover:bg-accent transition-transform duration-160 ease-out active:scale-95 motion-reduce:active:scale-[0.98]"
             onclick={() => player.next()}
             aria-label="Next"><SkipForward size={18} /></button
           >
