@@ -70,8 +70,15 @@
   let browserAnimated = false;
   // Resolved by afterNavigate once the new page's scroll position is set.
   let scrolled: (() => void) | null = null;
+  // The fade must never hold up a page change. On the iPhone app, Safari could sit on
+  // a transition for seconds before giving up, so both waits are capped, and a device
+  // that hits a cap gets plain page switches for the rest of the session.
+  const START_WITHIN = 200; // browser takes its "before" picture and starts the fade
+  const FINISH_WITHIN = 400; // new page rendered and scrolled
+  let fadeOff = false;
+  const wait = (ms: number) => new Promise<'late'>((r) => setTimeout(() => r('late'), ms));
   onNavigate((nav) => {
-    if (!document.startViewTransition) return;
+    if (fadeOff || !document.startViewTransition) return;
     // Same page, new query (search, sort): not a page change.
     if (nav.from?.url.pathname === nav.to?.url.pathname) return;
     if (nav.type === 'popstate' && browserAnimated) return;
@@ -79,12 +86,18 @@
     if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     return new Promise<void>((resolve) => {
       const ready = new Promise<void>((r) => (scrolled = r));
-      document.startViewTransition(async () => {
+      // Browser slow to start the fade: cancel it (that unfreezes the screen) and change page now.
+      const startTimer = setTimeout(() => {
+        fadeOff = true;
+        vt.skipTransition();
         resolve();
-        await nav.complete;
+      }, START_WITHIN);
+      const vt = document.startViewTransition(async () => {
+        clearTimeout(startTimer);
+        resolve();
         // Take the "after" picture once the scroll is restored, not before it jumps.
-        // Capped so a navigation that never finishes can't stall the page.
-        await Promise.race([ready, new Promise((r) => setTimeout(r, 300))]);
+        const done = nav.complete.then(() => ready).catch(() => {});
+        if ((await Promise.race([done, wait(FINISH_WITHIN)])) === 'late') fadeOff = true;
         scrolled = null;
       });
     });
