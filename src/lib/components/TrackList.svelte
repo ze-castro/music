@@ -5,7 +5,8 @@
   import Artwork from './Artwork.svelte';
   import LikeButton from './LikeButton.svelte';
   // `queue` = what actually plays (may be longer than rendered `tracks`, e.g. paginated lists)
-  // `context` = 'album' hides album link (already on album page)
+  // `context` = 'album' hides album link (already on album page);
+  // 'artist' keeps the album but hides the artist when it matches `albumArtist`
   let {
     tracks,
     queue = tracks,
@@ -18,7 +19,7 @@
     queue?: Track[];
     showArt?: boolean;
     numbered?: boolean;
-    context?: 'list' | 'album';
+    context?: 'list' | 'album' | 'artist';
     albumArtist?: string;
   } = $props();
   const play = (t: Track, i: number) =>
@@ -27,7 +28,7 @@
 
 <ol class="divide-y">
   {#each tracks as t, i (t.id + i)}
-    {@const showArtist = context !== 'album' || (!!t.artist && t.artist !== albumArtist)}
+    {@const showArtist = context === 'list' || (!!t.artist && t.artist !== albumArtist)}
     {@const showAlbum = context !== 'album' && !!t.album}
     <li
       class="flex items-center gap-3 px-2 py-2 hover:bg-accent/60 {player.current?.id === t.id
